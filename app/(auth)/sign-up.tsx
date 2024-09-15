@@ -157,21 +157,21 @@ const SignUp = () => {
             placeholder="john_doe"
             icon={icons.person}
             value={form.username}
-            onChangeText={(value) => setForm({ ...form, username: value })}
+            onChangeText={(value: string) => setForm({ ...form, username: value })}
           />
           <InputField
             label="First Name"
             placeholder="John"
             icon={icons.person}
             value={form.firstName}
-            onChangeText={(value) => setForm({ ...form, firstName: value })}
+            onChangeText={(value: string) => setForm({ ...form, firstName: value })}
           />
           <InputField
             label="Last Name"
             placeholder="Doe"
             icon={icons.person}
             value={form.lastName}
-            onChangeText={(value) => setForm({ ...form, lastName: value })}
+            onChangeText={(value: string) => setForm({ ...form, lastName: value })}
           />
           <InputField
             label="Email"
@@ -179,7 +179,7 @@ const SignUp = () => {
             icon={icons.email}
             textContentType="emailAddress"
             value={form.email}
-            onChangeText={(value) => setForm({ ...form, email: value })}
+            onChangeText={(value: string) => setForm({ ...form, email: value })}
           />
           <InputField
             label="Password"
@@ -188,7 +188,7 @@ const SignUp = () => {
             secureTextEntry={true}
             textContentType="password"
             value={form.password}
-            onChangeText={(value) => setForm({ ...form, password: value })}
+            onChangeText={(value: string) => setForm({ ...form, password: value })}
           />
           <CustomButton
             title="Sign Up"
@@ -225,7 +225,7 @@ const SignUp = () => {
               placeholder={"12345"}
               value={verification.code}
               keyboardType="numeric"
-              onChangeText={(code) =>
+              onChangeText={(code: string) =>
                 setVerification({ ...verification, code })
               }
             />
