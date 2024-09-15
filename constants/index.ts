@@ -8,6 +8,11 @@ import person from "@/assets/icons/person.png";
 import email from "@/assets/icons/email.png";
 import google from "@/assets/icons/google.png";
 import check from "@/assets/icons/check.png";
+import expense from "@/assets/icons/expense.png";
+import friend from "@/assets/icons/friend.png";
+import group from "@/assets/icons/group.png";
+import askFriend from "@/assets/icons/askFriend.png";
+import feedback from "@/assets/icons/feedback.png";
 
 export const images = {
   onboarding1,
@@ -21,7 +26,12 @@ export const icons = {
   person,
   email,
   google,
-  check
+  check,
+  expense,
+  friend,
+  group,
+  askFriend,
+  feedback
 }
 
 export const onboarding = [

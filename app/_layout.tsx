@@ -50,8 +50,9 @@ export default function RootLayout() {
       <ClerkLoaded>
         <QueryClientProvider client={queryClient}>
           <Stack>
-            <StatusBar style="light" />
+            <StatusBar style="dark" />
             <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
             <Stack.Screen name="help" options={{ title: 'Help', presentation: 'modal' }} />
