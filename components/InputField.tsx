@@ -11,7 +11,7 @@ import {
 
 import { InputFieldProps } from "@/types/types";
 
-const InputField = ({
+export const InputField = ({
   label,
   icon,
   secureTextEntry = false,
@@ -48,5 +48,3 @@ const InputField = ({
     </KeyboardAvoidingView>
   );
 };
-
-export default InputField;

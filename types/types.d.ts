@@ -36,3 +36,23 @@ declare interface InputFieldProps extends TextInputProps {
     iconStyle?: string;
     className?: string;
 }
+
+declare interface ExpenseCategory {
+    category: string;
+    totalExpense: number;
+    expenses: {
+        _id: string;
+        title: string;
+        amount: number;
+        description: string;
+        createdAt: string;
+    }[];
+};
+
+declare interface FeedbackType {
+    _id: string;
+    owner: { username: string; avatar: { url: string }; clerkId: string };
+    message: string;
+    createdAt: string;
+    isLiked: boolean;
+};

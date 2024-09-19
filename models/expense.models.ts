@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
-import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 export interface IExpense extends Document {
     owner: mongoose.Types.ObjectId;
@@ -37,7 +36,5 @@ const expenseSchema: Schema<IExpense> = new Schema({
 }, {
     timestamps: true
 });
-
-expenseSchema.plugin(mongooseAggregatePaginate);
 
 export const Expense: Model<IExpense> = mongoose.models.Expense || mongoose.model<IExpense>('Expense', expenseSchema);

@@ -1,23 +1,35 @@
 import { connect } from "@/lib/db";
 import FeedbackModel from "@/models/feedback.models";
 import { Like } from "@/models/like.models";
+import User from "@/models/user.models";
 import { createResponse } from "@/utils/ApiResponse";
 import { createError } from "@/utils/createError";
-import { useAuth, useUser } from "@clerk/clerk-expo";
 import mongoose from "mongoose";
 
 export async function POST(request: Request){
     await connect();
 
     try {
-        const { userId, has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!userId || !has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
-        const mongoId = user?.publicMetadata.mongoId;
+        const url = new URL(request.url);
+        const userId = url.searchParams.get('userId');
+
+        if (!userId) {
+            throw createError("User ID is required", 400, false);
+        }
+
+        const userInfo = await User.findOne({ clerkId: userId });
+
+        if (!userInfo) {
+            throw createError("User not found", 404, false);
+        }
+
+        const mongoId = userInfo?._id;
 
         if (!mongoId || !mongoose.isValidObjectId(mongoId)) {
             throw createError("Invalid mongodb ID", 400, false);
@@ -55,17 +67,30 @@ export async function POST(request: Request){
 }
 
 export async function DELETE(request: Request) {
-    try {
-        const {has } = useAuth();
+    await connect();
 
-        if (!has) {
+    try {
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
+
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
-        const mongoId = user?.publicMetadata.mongoId as string;
+        const url = new URL(request.url);
+        const userId = url.searchParams.get('userId');
+        const feedbackId = url.searchParams.get('feedbackId');
 
-        const { feedbackId } = await request.json();
+        if (!userId) {
+            throw createError("User ID is required", 400, false);
+        }
+
+        const userInfo = await User.findOne({ clerkId: userId });
+
+        if (!userInfo) {
+            throw createError("User not found", 404, false);
+        }
+
+        const mongoId = userInfo?._id;
 
         if (!feedbackId || !mongoose.isValidObjectId(feedbackId)) {
             throw createError("Invalid request ID", 400, false);
@@ -111,93 +136,37 @@ export async function DELETE(request: Request) {
     }
 }
 
-export async function PATCH(request: Request) {
-    try {
-    
-        const {has } = useAuth();
-
-        if (!has) {
-            throw createError("Unauthorized", 401, false);
-        }
-
-        const { user } = useUser();
-        const mongoId = user?.publicMetadata.mongoId as string;
-
-        const { feedbackId, message } = await request.json();
-
-        if (!feedbackId || !mongoose.isValidObjectId(feedbackId)) {
-            throw createError("Invalid request ID", 400, false);
-        }
-        
-        if (!mongoId || !mongoose.isValidObjectId(mongoId)) {
-            throw createError("Invalid mongodb ID", 400, false);
-        }
-    
-        if (!message) {
-            throw createError("Message is Required", 404, false);
-        }
-    
-        const feedbackDetails = await FeedbackModel.findById(feedbackId);
-    
-        if (!feedbackDetails) {
-            throw createError("Feedback not found", 404, false);
-        }
-    
-        const id = new mongoose.Types.ObjectId(mongoId);
-    
-        if (
-            !id || !id.equals(feedbackDetails.owner)
-        ) {
-            throw createError("You are not authorized to update this feedback", 200, true)
-        }
-    
-        const feedback = await FeedbackModel.findByIdAndUpdate(
-            feedbackDetails?._id,
-            {
-            $set: {
-                message,
-            },
-            },
-            { new: true }
-        );
-    
-        if (!feedback) {
-            throw createError("Failed to update feedback! Try again later", 400, false);
-        }
-    
-        return Response.json(
-            createResponse("Feedback Updated successfully", 200, true, feedback)
-        );
-    } catch (error) {
-        console.error("Error while updating feedback", error);
-        if (error instanceof Error) {
-            return new Response(JSON.stringify(error.message), { status: 500 });
-        }
-        return new Response(JSON.stringify(createError("Internal Server Error", 500, false)), { status: 500 });
-    }
-}
-
 export async function GET(request: Request) {
     await connect();
 
     try {
-        const { has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
-        const mongoId = user?.publicMetadata.mongoId as string;
-
         const url = new URL(request.url);
-        const page = parseInt(url.searchParams.get('page') || '1', 10);
-        const limit = parseInt(url.searchParams.get('limit') || '10', 10);
+        const page = parseInt(url.searchParams.get('page') || '1');
+        const limit = parseInt(url.searchParams.get('limit') || '10');
+        const userId = url.searchParams.get('userId');
+
+        if (!userId) {
+            throw createError("User ID is required", 400, false);
+        }
+
+        const userInfo = await User.findOne({ clerkId: userId });
+        
+        if (!userInfo) {
+            throw createError("User not found", 404, false);
+        }
+
+        const mongoId = userInfo?._id;
 
         if (!mongoId) {
             throw createError("Unauthorized", 401, false);
         }
-        
+
         const skip = (page - 1) * limit;
     
         const feedbacks = await FeedbackModel.aggregate([

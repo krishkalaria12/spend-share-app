@@ -2,7 +2,7 @@ import { connect } from "@/lib/db";
 import { Expense } from "@/models/expense.models";
 import User from "@/models/user.models";
 import { createResponse } from "@/utils/ApiResponse";
-import { createError } from "@/utils/createError";
+import { createError } from "@/utils/ApiError";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import mongoose from "mongoose";
 
