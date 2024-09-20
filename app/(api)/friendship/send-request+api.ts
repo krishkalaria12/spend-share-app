@@ -1,32 +1,43 @@
 import { connect } from "@/lib/db";
 import { Friendship } from "@/models/friendship.models";
-import User from "@/models/user.models";
-import { useAuth, useUser } from "@clerk/clerk-expo";
 import mongoose from "mongoose";
 import { createError } from "@/utils/createError";
 import { createResponse } from "@/utils/ApiResponse";
+import User from "@/models/user.models";
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: Request) {
     await connect();
 
     try {
-        const { userId, has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!userId || !has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
-        const mongoId = user?.publicMetadata.mongoId;
+        const url = new URL(request.url);
+        const userId = url.searchParams.get('userId');
+
+        if (!userId) {
+            throw createError("User ID is required", 400, false);
+        }
+
+        const userInfo = await User.findOne({ clerkId: userId });
+
+        if (!userInfo) {
+            throw createError("User not found", 404, false);
+        }
+
+        const mongoId = userInfo?._id;
+
+        if (!mongoId || !mongoose.isValidObjectId(mongoId)) {
+            throw createError("Invalid mongodb ID", 400, false);
+        }
 
         const { recipientId } = await request.json();
 
         if (!recipientId || !mongoose.isValidObjectId(recipientId)) {
             throw createError("Invalid request ID", 400, false);
-        }
-        
-        if (!mongoId || !mongoose.isValidObjectId(mongoId)) {
-            throw createError("Invalid mongodb ID", 400, false);
         }
 
         const existingRequest = await Friendship.findOne({

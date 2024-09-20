@@ -3,32 +3,23 @@ import { Friendship } from "@/models/friendship.models";
 import User from "@/models/user.models";
 import { createError } from "@/utils/ApiError";
 import { createResponse } from "@/utils/ApiResponse";
-import { useAuth, useUser } from "@clerk/clerk-expo";
-import { isValidObjectId, Types } from "mongoose";
+import mongoose, { isValidObjectId, Types } from "mongoose";
 
 export async function GET(request: Request) {
     await connect();
 
     try {
-        const { has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
-        const userId = user?.publicMetadata.mongoId as string;
-
-        if (!isValidObjectId(userId)) {
-            throw createError("Unauthorized", 401, false);
-        }
-
-        if (!has) {
-            throw createError("Unauthorized", 401, false);
-        }
+        const url = new URL(request.url);
+        const userId = url.searchParams.get('userId');
 
         if (!userId) {
-            throw createError("Unauthorized", 401, false);
+            throw createError("User ID is required", 400, false);
         }
 
         const userAccount = await User.findById(userId);
@@ -166,26 +157,33 @@ export async function DELETE(request: Request) {
     await connect();
 
     try {
-        const { userId, has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!userId || !has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
-        const mongoId = user?.publicMetadata.mongoId as string;
+        const url = new URL(request.url);
+        const userId = url.searchParams.get('userId');
+        const friendshipId = url.searchParams.get('friendshipId');
 
-        const { friendshipId } = await request.json();
+        if (!userId) {
+            throw createError("User ID is required", 400, false);
+        }
+
+        const userInfo = await User.findOne({ clerkId: userId });
+
+        if (!userInfo) {
+            throw createError("User not found", 404, false);
+        }
+
+        const mongoId = userInfo?._id;
+
+        if (!mongoId || !mongoose.isValidObjectId(mongoId)) {
+            throw createError("Invalid mongodb ID", 400, false);
+        }
     
-        if (!friendshipId) {
-            throw createError("Invalid friendship ID", 400, false);
-        }
-
-        if (!has || !mongoId) {
-            throw createError("Unauthorized", 401, false);
-        }
-
-        if (!isValidObjectId(friendshipId)) {
+        if (!friendshipId || !isValidObjectId(friendshipId)) {
             throw createError("Invalid friendship ID", 400, false);
         }
 

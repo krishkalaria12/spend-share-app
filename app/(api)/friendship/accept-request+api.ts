@@ -1,7 +1,6 @@
 import { connect } from "@/lib/db";
 import { Friendship } from "@/models/friendship.models";
 import User from "@/models/user.models";
-import { useAuth } from "@clerk/clerk-expo";
 import mongoose from "mongoose";
 import { createError } from "@/utils/createError";
 import { createResponse } from "@/utils/ApiResponse";
@@ -10,13 +9,27 @@ export async function POST(request: Request): Promise<Response> {
     await connect();
 
     try {
-        const { userId, has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!userId || !has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { requestId } = await request.json();
+        const url = new URL(request.url);
+        const clerkId= url.searchParams.get('userId');
+        const requestId = url.searchParams.get('requestId');
+
+        if (!clerkId) {
+            throw createError("User ID is required", 400, false);
+        }
+
+        const user = await User.findOne({ clerkId: clerkId });
+
+        if (!user) {
+            throw createError("User not found", 404, false);
+        }
+
+        const userId = user?._id;
 
         if (!requestId || !mongoose.isValidObjectId(requestId)) {
             throw createError("Invalid request ID", 400, false);
