@@ -14,7 +14,7 @@ export const OAuth = () => {
 
     if (result.code === "session_exists") {
       Alert.alert("Success", "Session exists. Redirecting to home screen.");
-      router.replace("/(tabs)/home");
+      router.replace("/(tabs)/expense");
     }
 
     Alert.alert(result.success ? "Success" : "Error", result.message);

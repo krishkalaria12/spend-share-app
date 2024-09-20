@@ -7,8 +7,8 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+import { envKeys } from '@/lib/env';
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 const queryClient = new QueryClient();
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -25,7 +25,7 @@ export default function RootLayout() {
     "Jakarta-SemiBold": require("../assets/fonts/PlusJakartaSans-SemiBold.ttf"),
   });
 
-  if (!publishableKey) {
+  if (!envKeys.clerkPublishableKey) {
     throw new Error(
       'Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env',
     )
@@ -46,7 +46,7 @@ export default function RootLayout() {
   }
 
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+    <ClerkProvider publishableKey={envKeys.clerkPublishableKey} tokenCache={tokenCache}>
       <ClerkLoaded>
         <QueryClientProvider client={queryClient}>
           <Stack>

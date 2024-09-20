@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { envKeys } from "./env";
 
 type ConnectionObject = {
     isConnected? : number;
@@ -13,7 +14,7 @@ export async function connect(): Promise<void> {
     }
 
     try {
-        const db = await mongoose.connect(process.env.MONGODB_URL || "")
+        const db = await mongoose.connect(envKeys.databaseURL || "")
         
         connection.isConnected = db.connections[0].readyState
 

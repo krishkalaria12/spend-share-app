@@ -6,7 +6,7 @@ import { ReactNativeModal } from "react-native-modal";
 import { useMutation } from "@tanstack/react-query";
 
 import { CustomButton } from "@/components/CustomButton";
-import InputField from "@/components/InputField";
+import { InputField } from "@/components/InputField";
 import { OAuth } from "@/components/OAuth";
 import { icons, images } from "@/constants";
 import { fetchAPI } from "@/lib/fetch";

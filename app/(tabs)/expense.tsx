@@ -1,74 +1,108 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react';
+import { Text, View, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@clerk/clerk-expo';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAllExpensesByCategory, getExpenseComparison } from '@/actions/expense.actions';
 import ServerError from '@/components/ServerError';
-import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native'
+import ToastManager from 'toastify-react-native';
+import { ExpenseComparison } from '@/components/expense/ExpenseComparision';
+import { ExpenseCategoryTabs } from '@/components/expense/ListExpense';
 
 const Expense = () => {
-    const [page, setPage] = useState(1);
-    const limit = 10;
+  const [page, setPage] = useState(1);
+  const limit = 10;
+  const [refreshing, setRefreshing] = useState(false);
 
-    const { data: expensesData, isLoading: loadingExpenses, isError: errorExpenses, isFetching: fetchingExpenses } = useQuery({
-        queryKey: ['expenses', page],
-        queryFn: () => getAllExpensesByCategory(page, limit),
-        placeholderData: (previousData) => previousData,
-    });
+  const { getToken, userId } = useAuth();
+  const queryClient = useQueryClient();
 
-    const { data: expenseComparison, isLoading: loadingComparison, isError: errorExpenseComparison } = useQuery({
-        queryKey: ['expense-comparison'],
-        queryFn: getExpenseComparison,
-    });
-    
-    if (loadingExpenses || loadingComparison) {
-        return (
-            <View>
-                <Text className='text-center font-bold font-JakartaBold text-2xl'>Loading...</Text>
-            </View>
-        )
-    }
-    
-    if (errorExpenses || errorExpenseComparison) {
-        return <ServerError />;
-    }
-    
-    const handlePageChange = (newPage: number) => {
-        if (newPage > 0 && newPage <= (expensesData?.totalPages || 1)) {
-            setPage(newPage);
-        }
-    };
+  // Fetch expenses by category
+  const { data: expensesData, isLoading: loadingExpenses, isError: errorExpenses, refetch: refetchExpenses } = useQuery({
+    queryKey: ['expenses', page],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token || !userId) {
+        throw new Error("Authentication required");
+      }
+      return getAllExpensesByCategory(page, limit, token, userId);
+    },
+    retry: false,
+  });
 
-    console.log(expenseComparison, expensesData);
+  // Fetch expense comparison
+  const { data: expenseComparison, isLoading: loadingComparison, isError: errorComparison, refetch: refetchComparison } = useQuery({
+    queryKey: ['expense-comparison'],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token || !userId) {
+        throw new Error("Authentication required");
+      }
+      return getExpenseComparison(token, userId);
+    },
+    retry: false,
+  });
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Promise.all([refetchExpenses(), refetchComparison()]).finally(() => setRefreshing(false));
+  }, [refetchExpenses, refetchComparison]);
+
+  if (errorExpenses || errorComparison) {
     return (
-        <View className={`flex-1 bg-muted/40`}>
-          <ScrollView className={`flex-grow p-4`}>
-            <View className={`grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-3`}>
-              <View className={`flex flex-col sm:grid gap-4 sm:grid-cols-1 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4`}>
-                
-    
-                {/* Expense Comparison Section
-                {expenseComparison && (
-                  <ExpenseComparison data={expenseComparison} />
-                )} */}
-              </View>
-    
-              {/* List Expenses */}
-              {/* {expensesData && expensesData.expenses.length > 0 ? (
-                <ListExpense expenses={expensesData.expenses} />
-              ) : (
-                <Text className={`text-center text-3xl font-bold tracking-tighter sm:text-3xl md:text-4xl`}>
-                  No expenses Found! Add your expense now to get started.
-                </Text>
-              )} */}
-    
-              {/* Pagination is excluded as requested */}
-    
-              {/* Loading Indicator */}
-              {fetchingExpenses && <ActivityIndicator size="large" color="#0000ff" />}
-            </View>
-          </ScrollView>
-        </View>
-      );
-}
+      <SafeAreaView className="flex-1 bg-gray-100 pt-4">
+        <ScrollView
+          className="flex-1 px-4"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <ServerError />
+          <Text className="mt-4 text-center text-lg font-semibold text-gray-600">
+            Pull to refresh and try again!
+          </Text>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
-export default Expense
+  if (loadingExpenses || loadingComparison || refreshing) {
+    return (
+      <SafeAreaView className="flex-1 justify-center items-center bg-gray-100">
+        <View className="flex items-center justify-center">
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text className="mt-4 text-lg font-semibold text-gray-600">Loading expenses...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView className="flex-1 bg-gray-100 pt-6">
+      <ScrollView
+        className="flex-1 px-4"
+        contentContainerStyle={{ paddingBottom: 50 }} // Add padding to avoid overlap at the bottom
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <ToastManager height={100} width={350} />
+        <Text className="text-3xl font-JakartaExtraBold font-bold mb-6 text-gray-800">
+          Expenses Overview
+        </Text>
+
+        {expenseComparison && (
+          <View className="mb-6">
+            <ExpenseComparison data={expenseComparison} />
+          </View>
+        )}
+
+        <View className="mb-6">
+          {expensesData && <ExpenseCategoryTabs data={{ expenses: expensesData.expenses }} />}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+export default Expense;

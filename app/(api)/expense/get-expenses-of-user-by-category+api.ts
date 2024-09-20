@@ -3,33 +3,35 @@ import { Expense } from "@/models/expense.models";
 import User from "@/models/user.models";
 import { createResponse } from "@/utils/ApiResponse";
 import { createError } from "@/utils/ApiError";
-import { useAuth, useUser } from "@clerk/clerk-expo";
 import mongoose from "mongoose";
 
 export async function GET(request: Request) {
     await connect();
     
     try {
-        const { has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
+        const url = new URL(request.url);
+        const page = parseInt(url.searchParams.get("page") || "1");
+        const limit = parseInt(url.searchParams.get("limit") || "10");
+        const skip = (page - 1) * limit;
+        const clerkId = url.searchParams.get('clerkId');
+
+        if (!clerkId) {
+            throw createError("Clerk ID is required", 400, false);
+        }
         
-        const userInfo = await User.findOne({ clerkId: user?.id });
+        const userInfo = await User.findOne({ clerkId: clerkId });
         
         if (!userInfo) {
             throw createError("User not found", 404, false);
         }
 
         const mongoId = userInfo?._id;
-
-        const url = new URL(request.url);
-        const page = parseInt(url.searchParams.get("page") || "1");
-        const limit = parseInt(url.searchParams.get("limit") || "10");
-        const skip = (page - 1) * limit;
 
         const pipeline: any[] = [
             {

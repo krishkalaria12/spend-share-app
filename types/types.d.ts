@@ -56,3 +56,16 @@ declare interface FeedbackType {
     createdAt: string;
     isLiked: boolean;
 };
+
+declare interface ExpenseComparisonProps {
+    data: {
+        monthExpense: number;
+        overallExpenseAmount: number;
+        percentageComparison: {
+            month: string;
+            week: string;
+        };
+        totalExpenseAmount: number;
+        weekExpense: number;
+    };
+}
