@@ -3,22 +3,22 @@ import { Expense } from "@/models/expense.models";
 import User from "@/models/user.models";
 import { createError } from "@/utils/ApiError";
 import { createResponse } from "@/utils/ApiResponse";
-import { useAuth, useUser } from "@clerk/clerk-expo";
 import mongoose from "mongoose";
 
 export async function GET(request: Request) {
     await connect();
 
     try {
-        const { userId, has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!userId || !has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
+        const url = new URL(request.url);
+        const clerkId = url.searchParams.get('clerkId');
         
-        const userInfo = await User.findOne({ clerkId: user?.id });
+        const userInfo = await User.findOne({ clerkId: clerkId });
         
         if (!userInfo) {
             throw createError("User not found", 404, false);

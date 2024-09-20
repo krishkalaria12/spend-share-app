@@ -1,26 +1,29 @@
 import { connect } from "@/lib/db";
 import { Expense } from "@/models/expense.models";
-import FeedbackModel from "@/models/feedback.models";
 import User from "@/models/user.models";
 import { createResponse } from "@/utils/ApiResponse";
 import { createError } from "@/utils/createError";
-import { useAuth, useUser } from "@clerk/clerk-expo";
 import mongoose from "mongoose";
 
 export async function POST(request: Request){
     await connect();
 
     try {
-        const { userId, has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!userId || !has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
-        
-        const userInfo = await User.findOne({ clerkId: user?.id });
-        
+        const url = new URL(request.url);
+        const userId = url.searchParams.get('userId');
+
+        if (!userId) {
+            throw createError("User ID is required", 400, false);
+        }
+
+        const userInfo = await User.findOne({ clerkId: userId });
+
         if (!userInfo) {
             throw createError("User not found", 404, false);
         }
@@ -78,18 +81,29 @@ export async function DELETE(request: Request) {
     await connect();
     
     try {
-        const { has } = useAuth();
+        const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 
-        if (!has) {
+        if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const { user } = useUser();
-        
-        const userInfo = await User.findOne({ clerkId: user?.id });
-        
+        const url = new URL(request.url);
+        const clerkId = url.searchParams.get('userId');
+
+        if (!clerkId) {
+            throw createError("User ID is required", 400, false);
+        }
+
+        const userInfo = await User.findOne({ clerkId: clerkId });
+
         if (!userInfo) {
             throw createError("User not found", 404, false);
+        }
+
+        const mongoId = userInfo?._id;
+
+        if (!mongoId || !mongoose.isValidObjectId(mongoId)) {
+            throw createError("Invalid mongodb ID", 400, false);
         }
 
         const { expenseId } = await request.json();
@@ -103,8 +117,6 @@ export async function DELETE(request: Request) {
         if (!expenseDetails) {
             throw createError("Expense not found", 404, false);
         }
-
-        const mongoId = userInfo?._id;
 
         const userId = new mongoose.Types.ObjectId(mongoId);
 
