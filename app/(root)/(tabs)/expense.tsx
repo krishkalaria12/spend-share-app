@@ -1,37 +1,36 @@
-import React, { useState, useCallback } from 'react';
-import { Text, View, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Text, View, ScrollView, RefreshControl, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/clerk-expo';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deleteAllExpenses, getAllExpensesByCategory, getExpenseComparison } from '@/actions/expense.actions';
+import { deleteAllExpenses, getAllExpenses, getExpensePagination, getExpenseComparison } from '@/actions/expense.actions';
 import ServerError from '@/components/ServerError';
 import ToastManager from 'toastify-react-native';
 import { ExpenseComparison } from '@/components/expense/ExpenseComparision';
 import { ExpenseCategoryTabs } from '@/components/expense/ListExpense';
-import { TouchableOpacity } from 'react-native';
 import { ChartPieIcon, PlusIcon, TrashIcon } from 'react-native-heroicons/outline';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 
 const Expense = () => {
-  const [page, setPage] = useState(1);
-  const limit = 10;
+  const [activeCategory, setActiveCategory] = useState<string>('Food');
   const [refreshing, setRefreshing] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const { getToken, userId } = useAuth();
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  // Fetch expenses by category
+  // Fetch all expenses
   const { data: expensesData, isLoading: loadingExpenses, isError: errorExpenses, refetch: refetchExpenses } = useQuery({
-    queryKey: ['expenses', page],
+    queryKey: ['expenses'],
     queryFn: async () => {
       const token = await getToken();
       if (!token || !userId) {
         throw new Error("Authentication required");
       }
-      return getAllExpensesByCategory(page, limit, token, userId);
+      return getAllExpenses(token, userId);
     },
     retry: false,
   });
@@ -87,6 +86,71 @@ const Expense = () => {
     Promise.all([refetchExpenses(), refetchComparison()]).finally(() => setRefreshing(false));
   }, [refetchExpenses, refetchComparison]);
 
+  const handlePageChange = async (newPage: number) => {
+    const activeCategoryData = expensesData?.expenses.find((cat: { category: string; }) => cat.category === activeCategory);
+    
+    if (!activeCategoryData) return;
+
+    // If we're moving to a page we've already loaded, don't fetch new data
+    if (newPage <= activeCategoryData.currentPage) {
+      queryClient.setQueryData(['expenses'], (oldData: any) => ({
+        ...oldData,
+        expenses: oldData.expenses.map((cat: any) => 
+          cat.category === activeCategory 
+            ? { ...cat, currentPage: newPage }
+            : cat
+        )
+      }));
+      return;
+    }
+
+    setLoadingMore(true);
+    try {
+      const token = await getToken();
+      if (!token || !userId) {
+        throw new Error("Authentication required");
+      }
+      const newExpenses = await getExpensePagination(newPage, 10, token, userId, activeCategory);
+      queryClient.setQueryData(['expenses'], (oldData: any) => ({
+        ...oldData,
+        expenses: oldData.expenses.map((cat: any) => 
+          cat.category === activeCategory 
+            ? { 
+                ...cat, 
+                currentPage: newPage, 
+                expenses: [...cat.expenses, ...newExpenses.expenses],
+                totalPages: newExpenses.totalPages
+              }
+            : cat
+        )
+      }));
+    } catch (error) {
+      console.error('Error fetching more expenses:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to load more expenses',
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleCategoryChange = (category: string) => {
+    setActiveCategory(category);
+  };
+
+  const memoizedExpensesData = useMemo(() => {
+    if (!expensesData) return null;
+    return {
+      ...expensesData,
+      expenses: expensesData.expenses.map((category: { expenses: string | any[]; currentPage: number; }) => ({
+        ...category,
+        expenses: category.expenses.slice(0, category.currentPage * 10) // Only show loaded expenses
+      }))
+    };
+  }, [expensesData]);
+
   if (errorExpenses || errorComparison) {
     return (
       <SafeAreaView className="flex-1 bg-gray-100 pt-4">
@@ -120,7 +184,7 @@ const Expense = () => {
     <SafeAreaView className="flex-1 bg-gray-100 pt-6">
       <ScrollView
         className="flex-1 px-4"
-        contentContainerStyle={{ paddingBottom: 80 }} // Add padding to avoid overlap at the bottom
+        contentContainerStyle={{ paddingBottom: 80 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -131,7 +195,7 @@ const Expense = () => {
             Expenses
           </Text>
           <TouchableOpacity
-            onPress={() => router.navigate("/(root)/add-expense")}
+            onPress={() => router.push("/(root)/add-expense")}
             className="bg-primary-500 p-3 rounded-full shadow-md"
           >
             <PlusIcon size={24} color="white" />
@@ -162,9 +226,50 @@ const Expense = () => {
         )}
 
         <View className="mb-6">
-          {expensesData && <ExpenseCategoryTabs data={{ expenses: expensesData.expenses }} />}
+        {memoizedExpensesData && (
+          <ExpenseCategoryTabs 
+            data={memoizedExpensesData.expenses}
+            onPageChange={handlePageChange}
+            onCategoryChange={handleCategoryChange}
+            activeCategory={activeCategory}
+            loadingMore={loadingMore}
+          />
+        )}
         </View>
       </ScrollView>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={deleteModalVisible}
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white p-6 rounded-lg shadow-lg w-4/5">
+            <Text className="text-xl font-JakartaBold mb-4 text-center">
+              Confirm Delete
+            </Text>
+            <Text className="text-base mb-6 text-center">
+              Are you sure you want to delete all expenses? This action cannot be undone.
+            </Text>
+            <View className="flex-row justify-around">
+              <TouchableOpacity
+                onPress={() => setDeleteModalVisible(false)}
+                className="bg-gray-300 py-2 px-4 rounded-full"
+              >
+                <Text className="text-black font-JakartaBold">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={confirmDeleteAll}
+                className="bg-danger-500 py-2 px-4 rounded-full"
+              >
+                <Text className="text-white font-JakartaBold">Delete All</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

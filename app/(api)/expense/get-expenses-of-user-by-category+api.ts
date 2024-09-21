@@ -10,15 +10,12 @@ export async function GET(request: Request) {
     
     try {
         const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
-
         if (!sessionToken) {
             throw createError("Unauthorized", 401, false);
         }
 
         const url = new URL(request.url);
-        const page = parseInt(url.searchParams.get("page") || "1");
         const limit = parseInt(url.searchParams.get("limit") || "10");
-        const skip = (page - 1) * limit;
         const clerkId = url.searchParams.get('clerkId');
 
         if (!clerkId) {
@@ -31,59 +28,50 @@ export async function GET(request: Request) {
             throw createError("User not found", 404, false);
         }
 
-        const mongoId = userInfo?._id;
+        const mongoId = userInfo._id;
 
-        const pipeline: any[] = [
-            {
-                $match: {
-                    owner: new mongoose.Types.ObjectId(mongoId),
-                },
-            },
-            { $sort: { createdAt: -1 } },
-            {
-                $group: {
-                    _id: "$category",
-                    totalExpense: { $sum: "$amount" },
-                    expenses: { $push: "$$ROOT" },
-                },
-            },
-            {
-                $project: {
-                    _id: 0,
-                    category: "$_id",
-                    totalExpense: 1,
-                    expenses: { $slice: ["$expenses", skip, limit] },
-                },
-            },
-        ];
+        const allCategories = ['Food', 'Miscellaneous', 'Studies', 'Outing'];
 
-        const expense = await Expense.aggregate(pipeline);
-        const totalExpenses = await Expense.countDocuments({
-            owner: new mongoose.Types.ObjectId(mongoId),
-        });
+        const categoriesData = await Promise.all(allCategories.map(async (category) => {
+            const totalCount = await Expense.countDocuments({ owner: mongoId, category });
+            const totalPages = Math.ceil(totalCount / limit);
+            const totalExpense = await Expense.aggregate([
+                { $match: { owner: new mongoose.Types.ObjectId(mongoId), category } },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]);
 
-        if (!expense) {
-            return new Response(
-                JSON.stringify(createError("Error fetching expenses", 500, false)),
-                { status: 500 }
-            );
-        }
-        const response = {
-            expenses: expense,
-            totalPages: Math.ceil(totalExpenses / limit),
-            currentPage: page,
-        };
+            const expenses = await Expense.find({ owner: mongoId, category })
+                .sort({ createdAt: -1 })
+                .limit(limit);
 
-        return Response.json( 
+            return {
+                category,
+                totalExpense: totalExpense[0]?.total || 0,
+                totalPages,
+                currentPage: 1,
+                expenses
+            };
+        }));
+
+        return Response.json(
             createResponse(
-                "Expense of the user by category fetched Successfully", 200, true, response
+                "Expenses fetched successfully", 
+                200, 
+                true, 
+                { expenses: categoriesData }
             )
         );
     } catch (error) {
-        console.error("Error while fetching Expense of user by category: ", error);
+        console.error("Error while fetching expenses: ", error);
         if (error instanceof Error) {
-            return new Response(JSON.stringify(error.message), { status: 500 });
+            return new Response(
+                JSON.stringify(createError(error.message, 500, false)),
+                { status: 500 }
+            );
         }
-        return new Response(JSON.stringify(createError("Internal Server Error", 500, false)), { status: 500 });
+        return new Response(
+            JSON.stringify(createError("Internal Server Error", 500, false)),
+            { status: 500 }
+        );
     }
 }

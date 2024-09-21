@@ -3,7 +3,7 @@ import { Friendship } from "@/models/friendship.models";
 import User from "@/models/user.models";
 import { createError } from "@/utils/ApiError";
 import { createResponse } from "@/utils/ApiResponse";
-import mongoose, { isValidObjectId, Types } from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 
 export async function GET(request: Request) {
     await connect();
@@ -17,12 +17,12 @@ export async function GET(request: Request) {
 
         const url = new URL(request.url);
         const userId = url.searchParams.get('userId');
-
+        
         if (!userId) {
             throw createError("User ID is required", 400, false);
         }
 
-        const userAccount = await User.findById(userId);
+        const userAccount = await User.findOne({ clerkId: userId });
 
         if (!userAccount) {
             throw createError("Unauthorized", 401, false);
@@ -35,15 +35,15 @@ export async function GET(request: Request) {
                         {
                             $match: {
                                 $or: [
-                                    { user: new Types.ObjectId(userId), status: 'fulfilled' },
-                                    { friend: new Types.ObjectId(userId), status: 'fulfilled' },
+                                    { user: userAccount._id, status: 'fulfilled' }, // userAccount._id is already ObjectId
+                                    { friend: userAccount._id, status: 'fulfilled' },
                                 ],
                             },
                         },
                         {
                             $lookup: {
                                 from: 'users',
-                                let: { friendId: { $cond: { if: { $eq: ['$user', new Types.ObjectId(userId)] }, then: '$friend', else: '$user' } } },
+                                let: { friendId: { $cond: { if: { $eq: ['$user', userAccount._id] }, then: '$friend', else: '$user' } } },
                                 pipeline: [
                                     { $match: { $expr: { $eq: ['$_id', '$$friendId'] } } },
                                     { $project: { _id: 1, username: 1, email: 1, fullName: 1, avatar: 1 } },
@@ -59,14 +59,14 @@ export async function GET(request: Request) {
                                 email: '$friendDetails.email',
                                 fullName: '$friendDetails.fullName',
                                 avatar: '$friendDetails.avatar',
-                                friendshipId: '$_id'
+                                friendshipId: '$_id',
                             }
                         }
                     ],
                     pendingRequests: [
                         {
                             $match: {
-                                friend: new Types.ObjectId(userId),
+                                friend: userAccount._id,
                                 status: 'pending',
                             },
                         },
@@ -96,7 +96,7 @@ export async function GET(request: Request) {
                     yourRequests: [
                         {
                             $match: {
-                                user: new Types.ObjectId(userId),
+                                user: userAccount._id,
                                 status: 'pending',
                             },
                         },

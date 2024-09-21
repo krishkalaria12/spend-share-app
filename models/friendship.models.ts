@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
-import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2';
 
 export interface IFriendship extends Document {
     user: mongoose.Types.ObjectId;
@@ -31,7 +30,5 @@ const friendshipSchema: Schema<IFriendship> = new Schema(
         timestamps: true,
     }
 );
-
-friendshipSchema.plugin(mongooseAggregatePaginate);
 
 export const Friendship: Model<IFriendship> = mongoose.models.Friendship || mongoose.model<IFriendship>('Friendship', friendshipSchema);

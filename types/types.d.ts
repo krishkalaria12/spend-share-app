@@ -69,3 +69,28 @@ declare interface ExpenseComparisonProps {
         weekExpense: number;
     };
 }
+
+declare interface Friend {
+    clerkId?: string | null | undefined;
+    _id: string;
+    username: string;
+    email: string;
+    fullName: string;
+    avatar: string;
+    isAdmin?: boolean;
+}
+
+declare interface FriendRequest {
+    _id: string;
+    user: Friend;
+    status: 'pending' | 'fulfilled';
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+declare interface GroupFriend {
+    _id: string;
+    username: string;
+    email: string;
+    avatar: string;
+}

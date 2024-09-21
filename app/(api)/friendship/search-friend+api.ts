@@ -24,7 +24,8 @@ export async function GET(request: Request) {
         }
 
         const userInfo = await User.findOne({ clerkId: clerkId });
-
+        console.log(userInfo);
+        
         if (!userInfo) {
             throw createError("User not found", 404, false);
         }
