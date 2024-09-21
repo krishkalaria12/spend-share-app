@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { envKeys } from '@/lib/env';
+import Toast from 'react-native-toast-message';
 
 const queryClient = new QueryClient();
 
@@ -52,10 +53,11 @@ export default function RootLayout() {
           <Stack>
             <StatusBar style="auto" />
             <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(root)" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
             <Stack.Screen name="help" options={{ title: 'Help', presentation: 'modal' }} />
+            <Toast />
           </Stack>
         </QueryClientProvider>
       </ClerkLoaded>

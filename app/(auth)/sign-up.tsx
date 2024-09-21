@@ -124,7 +124,7 @@ const SignUp = () => {
           avatar: "https://utfs.io/f/zDChzk2sNFdiA7tAXerYrEUV5sR61fmF9eAzIQNdoPjbinw0"
         });
         await setActive({ session: completeSignUp.createdSessionId });
-        router.replace("/(tabs)/expense");
+        router.replace("/(root)/(tabs)/expense");
       } else {
         setVerification({
           ...verification,

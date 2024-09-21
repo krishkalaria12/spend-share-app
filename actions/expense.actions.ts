@@ -88,3 +88,65 @@ export const deleteExpense = async (
     const data = await response.json();
     return data.data;
 }
+
+interface ExpenseFormData {
+    title: string;
+    amount: string;
+    description: string | undefined;
+    category: string;
+}
+
+export const addExpense = async (data: ExpenseFormData, token: string, userId: string) => {
+    try {
+        if (!token || !userId) {
+            throw new Error("Authentication required");
+        }
+
+        const response = await fetch(`/(api)/expense/expense/?userId=${userId}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Error submitting expense");
+        }
+
+        const expenseData = await response.json();
+        return expenseData;
+    } catch (error: any) {
+        throw new Error(error.message || "Failed to submit expense");
+    }
+};
+
+export const deleteAllExpenses = async (
+    token: string | null,
+    userId: string | null | undefined
+) => {
+    if (!token || !userId) {
+        throw new Error("Authentication required");
+    }
+
+    const response = await fetch(
+        `/(api)/expense/expense/?userId=${userId}`,
+        {
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(
+            `Error deleting all expenses: ${response.statusText}`
+        );
+    }
+
+    const data = await response.json();
+    return data.data;
+}
