@@ -1,12 +1,13 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { InputField } from '@/components/InputField'; // Your custom InputField component
-import { FriendCard } from '@/components/friend/FriendCard'; // Assuming you have a FriendCard component
-import { useDebouncedCallback } from 'use-debounce'; // Library for debouncing
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Animated } from 'react-native';
+import { InputField } from '@/components/InputField';
+import { FriendCard } from '@/components/friend/FriendCard';
+import { useDebouncedCallback } from 'use-debounce';
+import { Friend } from '@/types/types';
 
 interface SearchFriendProps {
   loading: boolean;
-  searchResults: any[];
+  searchResults: Friend[];
   onSearchQueryChange: (query: string) => void;
   query: string;
   method: (id: string) => void;
@@ -22,19 +23,30 @@ export const SearchFriend: React.FC<SearchFriendProps> = ({
   remove
 }) => {
   const [searchText, setSearchText] = useState(query);
+  const [fadeAnim] = useState(new Animated.Value(0));
 
-  // Debounce search input to avoid unnecessary calls
   const debouncedSearch = useDebouncedCallback((value) => {
     onSearchQueryChange(value);
   }, 500);
 
   const handleInputChange = (value: string) => {
     setSearchText(value);
-    debouncedSearch(value); // Apply debounced search
+    debouncedSearch(value);
   };
 
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, flexGrow: 1 }}>
+    <Animated.ScrollView
+      contentContainerStyle={{ padding: 16, flexGrow: 1 }}
+      style={{ opacity: fadeAnim }}
+    >
       <View className="my-2">
         <Text className="text-3xl font-JakartaExtraBold text-secondary-900 mb-4">
           Find and Add Friends
@@ -53,9 +65,12 @@ export const SearchFriend: React.FC<SearchFriendProps> = ({
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#0286FF" />
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#0286FF" />
+          <Text className="mt-4 text-secondary-600 font-JakartaMedium">Searching for friends...</Text>
+        </View>
       ) : searchResults.length === 0 && searchText.trim() !== '' ? (
-        <Text className="text-gray-500 text-center mt-8">No results found.</Text>
+        <Text className="text-gray-500 text-center mt-8 font-JakartaMedium">No results found.</Text>
       ) : (
         searchResults.map((friend) => (
           <FriendCard
@@ -66,6 +81,6 @@ export const SearchFriend: React.FC<SearchFriendProps> = ({
           />
         ))
       )}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 };

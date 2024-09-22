@@ -81,6 +81,8 @@ declare interface Friend {
 }
 
 declare interface FriendRequest {
+    sender?: Friend & { friendshipId?: string | undefined; };
+    receiver?: Friend & { friendshipId?: string | undefined; };
     _id: string;
     user: Friend;
     status: 'pending' | 'fulfilled';
