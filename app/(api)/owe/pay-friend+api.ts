@@ -12,8 +12,8 @@ export async function POST(request: Request) {
 
     try {
         const url = new URL(request.url);
-        const oweId = url.searchParams.get('userId');
-        const clerkId = url.searchParams.get('clientId');
+        const oweId = url.searchParams.get('oweId');
+        const clerkId = url.searchParams.get('clerkId');
 
         const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
 

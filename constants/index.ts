@@ -2,6 +2,7 @@ import onboarding1 from "@/assets/images/onboarding-01.png";
 import onboarding2 from "@/assets/images/onboarding-02.png";
 import onboarding3 from "@/assets/images/onboarding-03.jpg";
 import signUpImage from "@/assets/images/sign-up.jpg";
+import groupNotFound from "@/assets/images/group.jpg"
 
 import lock from "@/assets/icons/lock.png";
 import person from "@/assets/icons/person.png";
@@ -18,7 +19,8 @@ export const images = {
   onboarding1,
   onboarding2,
   onboarding3,
-  signUpImage
+  signUpImage,
+  groupNotFound
 };
 
 export const icons = {

@@ -9,23 +9,25 @@ export async function GET(request: Request) {
     await connect();
 
     try {
-        const url = new URL(request.url);
         const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
-        const userId = url.searchParams.get('userId');
+        const url = new URL(request.url);
+        const clerkId = url.searchParams.get('clerkId');
 
         if (!sessionToken) {
             return new Response(JSON.stringify(createError("Unauthorized", 401, false)), { status: 401 });
         }
 
-        if (!userId || !mongoose.isValidObjectId(userId)) {
+        if (!clerkId) {
             return new Response(JSON.stringify(createError("Invalid user ID", 400, false)), { status: 400 });
         }
 
         // Check if the user exists in the database
-        const user = await User.findById(userId);
+        const user = await User.findOne({ clerkId: clerkId });
         if (!user) {
             return new Response(JSON.stringify(createError("User not found", 404, false)), { status: 404 });
         }
+
+        const userId = user?._id;
 
         // Fetch all groups where the user is a member
         const groups = await Group.aggregate([

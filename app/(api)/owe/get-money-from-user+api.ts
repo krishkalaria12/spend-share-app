@@ -19,17 +19,19 @@ export async function GET(request: Request) {
         }
 
         const url = new URL(request.url);
-        const userId = url.searchParams.get('userId');
-
-        if (!userId || !mongoose.isValidObjectId(userId)) {
+        const clerkId = url.searchParams.get('userId');
+        
+        if (!clerkId) {
             return Response.json(createError("Invalid user ID", 400, false));
         }
 
-        const userInfo = await User.findOne({ clerkId: userId });
+        const userInfo = await User.findOne({ clerkId: clerkId });
 
         if (!userInfo) {
             throw createError("User not found", 404, false);
         }
+
+        const userId = userInfo?._id;
 
         const pipeline = [
             {

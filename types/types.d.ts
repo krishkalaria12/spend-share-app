@@ -96,3 +96,63 @@ declare interface GroupFriend {
     email: string;
     avatar: string;
 }
+
+export interface Group {
+    _id: string;
+    name: string;
+    description: string;
+    friends: Friend[];
+    members: Friend[];
+    avatar: string;
+    isAdmin?: boolean;
+    totalMembers?: number;
+}
+
+declare interface Transaction {
+    owes: any;
+    totalAmount: any;
+    _id: string;
+    title: string;
+    amount: number;
+    description: string;
+    category: string;
+    paid: boolean;
+    creditor: {
+        _id: string;
+        username: string;
+        avatar: string;
+    };
+    createdAt: string;
+}
+
+declare interface Owe {
+    _id: string;
+    category: string;
+    amount: number;
+    title: string;
+    description?: string;
+    paid: boolean;
+    debtor: string;
+    creditor: string;
+    status: 'pending' | 'confirmed';
+    debtorInfo?: {
+        email: string;
+        fullName: string;
+        username: string;
+        avatar: string;
+    };
+    creditorInfo?: {
+        email: string;
+        fullName: string;
+        username: string;
+        avatar: string;
+    };
+}
+
+declare interface OweCreation {
+    category: string;
+    amount: number;
+    title: string;
+    description?: string;
+    friendId?: string;
+}
