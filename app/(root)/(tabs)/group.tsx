@@ -1,21 +1,21 @@
-import React from "react";
-import { SafeAreaView, ScrollView, View, Text, ActivityIndicator, TouchableOpacity, Image } from "react-native";
+import React, { useRef, useEffect, useCallback } from "react";
+import { SafeAreaView, ScrollView, View, Text, ActivityIndicator, TouchableOpacity, Image, Animated, RefreshControl } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from '@clerk/clerk-expo';
 import { getAllGroups } from "@/actions/group.actions";
 import { GroupCard } from "@/components/group/GroupCard";
 import Toast from 'react-native-toast-message';
-import { Link, useRouter } from 'expo-router'; // You can also use React Navigation
-import { Group } from "@/types/types"; // Import your types here
+import { Link, useRouter } from 'expo-router';
+import { Group } from "@/types/types";
 import ServerError from "@/components/ServerError";
 import { images } from "@/constants";
 
 const GroupPage: React.FC = () => {
   const { getToken, userId } = useAuth();
   const router = useRouter();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Fetch groups using React Query
-  const { data: groups, isLoading: loadingGroups, isError } = useQuery<Group[]>({
+  const { data: groups, isLoading: loadingGroups, isError, refetch } = useQuery<Group[]>({
     queryKey: ["groups"],
     queryFn: async () => {
       const token = await getToken();
@@ -25,70 +25,89 @@ const GroupPage: React.FC = () => {
     retry: false,
   });
 
-  console.log(groups);
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
 
   if (loadingGroups) {
     return (
-        <SafeAreaView className="flex-1 justify-center items-center bg-gray-100">
-          <View className="flex items-center justify-center">
-            <ActivityIndicator size="large" color="#3b82f6" />
-            <Text className="mt-4 text-lg font-semibold text-gray-600">Loading your groups...</Text>
-          </View>
-        </SafeAreaView>
-      );
+      <SafeAreaView className="flex-1 justify-center items-center bg-primary-100">
+        <View className="flex items-center justify-center">
+          <ActivityIndicator size="large" color="#0286FF" />
+          <Text className="mt-4 text-lg font-JakartaSemiBold text-primary-700">Loading your groups...</Text>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   if (isError) {
     return (
-        <SafeAreaView className="flex-1 bg-gray-100 pt-4">
-          <ScrollView className="flex-1 px-4">
-            <ServerError />
-            <Text className="mt-4 text-center text-lg font-semibold text-gray-600">
-              Pull to refresh and try again!
-            </Text>
-          </ScrollView>
-        </SafeAreaView>
-      );
+      <SafeAreaView className="flex-1 bg-primary-100 pt-4">
+        <ScrollView 
+          className="flex-1 px-4"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <ServerError />
+          <Text className="mt-4 text-center text-lg font-JakartaMedium text-primary-700">
+            Pull to refresh and try again!
+          </Text>
+        </ScrollView>
+      </SafeAreaView>
+    );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 80, paddingTop: 50 }}>
-        {/* Header */}
-        <View className={`flex-row ${groups && groups.length > 0 ? "justify-between" : "justify-end"}`}>
+    <SafeAreaView className="flex-1 bg-primary-100">
+      <Animated.ScrollView 
+        contentContainerStyle={{ padding: 20, paddingBottom: 80, paddingTop: 50 }}
+        style={{ opacity: fadeAnim }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View className={`flex-row items-center ${groups && groups.length > 0 ? "justify-between" : "justify-end"} mb-6`}>
           {groups && groups.length > 0 && (
-            <Text className="text-2xl font-bold tracking-wide">
+            <Text className="text-3xl font-JakartaBold text-primary-900 tracking-wide">
               Your Groups
             </Text>
           )}
-          {/* Create Group Button */}
           <TouchableOpacity
             onPress={() => router.push("/group/create")}
-            className="bg-primary-500 p-3 rounded-full"
+            className="bg-primary-500 px-4 py-3 rounded-full shadow-md"
           >
-            <Text className="text-white font-semibold">Create Group</Text>
+            <Text className="text-white font-JakartaSemiBold">Create Group</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Groups List */}
         <View className="mt-4">
           {groups && groups.length > 0 ? (
-            <View className="grid grid-cols-2 gap-4">
+            <View className="">
               {groups.map((group) => (
-                <Link href={`/group/${group._id}`} asChild key={group._id}>
-                  <TouchableOpacity className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 m-4">
-                    <GroupCard group={group} />
-                  </TouchableOpacity>
-                </Link>
+                <View key={group._id} className="mt-4">
+                  <GroupCard group={group} onPress={() => router.push(`/group/${group._id}`)} />
+                </View>
               ))}
             </View>
           ) : (
-            // No Groups Found
-            <View className="items-center">
-              <Text className="text-center text-3xl font-bold">
-                You don't have any groups yet.
+            <Animated.View className="items-center" style={{ opacity: fadeAnim }}>
+              <Text className="text-center text-3xl font-JakartaBold text-primary-900">
+                No groups yet
               </Text>
-              <Text className="text-center text-gray-400 mt-2">
+              <Text className="text-center text-primary-700 mt-2 font-JakartaMedium">
                 Create one now and start managing money together!
               </Text>
               <Image
@@ -96,10 +115,10 @@ const GroupPage: React.FC = () => {
                 style={{ width: 300, height: 300, marginTop: 20 }}
                 resizeMode="contain"
               />
-            </View>
+            </Animated.View>
           )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       <Toast />
     </SafeAreaView>

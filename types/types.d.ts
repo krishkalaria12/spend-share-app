@@ -71,6 +71,7 @@ declare interface ExpenseComparisonProps {
 }
 
 declare interface Friend {
+    length?: ReactNode;
     clerkId?: string | null | undefined;
     _id: string;
     username: string;
@@ -98,6 +99,8 @@ declare interface GroupFriend {
 }
 
 export interface Group {
+    transactions?: any;
+    balance?: any;
     _id: string;
     name: string;
     description: string;
