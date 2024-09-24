@@ -11,31 +11,34 @@ export async function PATCH(request: Request) {
 
   try {
     const sessionToken = request.headers.get("Authorization")?.split(" ")[1];
-    const { groupId, memberId } = await request.json();
 
     // Validate token
     if (!sessionToken) {
       return new Response(JSON.stringify(createError("Unauthorized", 401, false)), { status: 401 });
     }
+    
+    const url = new URL(request.url);
+    const clerkId = url.searchParams.get("userId");
+    const groupId = url.searchParams.get("groupId");
+    const memberId = url.searchParams.get("memberId");
+    
+    if (!clerkId) {
+      return new Response(JSON.stringify(createError("Invalid user ID", 400, false)), { status: 400 });
+    }
+    
+    const userInfo = await User.findOne({ clerkId: clerkId });
+    if (!userInfo) {
+      return new Response(JSON.stringify(createError("User not found", 404, false)), { status: 404 });
+    }
 
+    const userId = userInfo._id;
+    
     if (!groupId || !memberId) {
       return new Response(JSON.stringify(createError("Invalid group ID or member ID", 400, false)), { status: 400 });
     }
 
     if (!isValidObjectId(groupId) || !isValidObjectId(memberId)) {
       return new Response(JSON.stringify(createError("Invalid group ID or member ID", 400, false)), { status: 400 });
-    }
-
-    const url = new URL(request.url);
-    const userId = url.searchParams.get("userId");
-
-    if (!userId || !mongoose.isValidObjectId(userId)) {
-      return new Response(JSON.stringify(createError("Invalid user ID", 400, false)), { status: 400 });
-    }
-
-    const userInfo = await User.findOne({ clerkId: userId });
-    if (!userInfo) {
-      return new Response(JSON.stringify(createError("User not found", 404, false)), { status: 404 });
     }
 
     const group = await Group.findById(groupId);
@@ -79,31 +82,34 @@ export async function DELETE(request: Request) {
 
   try {
     const sessionToken = request.headers.get("Authorization")?.split(" ")[1];
-    const { groupId, memberId } = await request.json();
 
     // Validate token
     if (!sessionToken) {
       return new Response(JSON.stringify(createError("Unauthorized", 401, false)), { status: 401 });
     }
+    
+    const url = new URL(request.url);
+    const clerkId = url.searchParams.get("userId");
+    const memberId = url.searchParams.get("memberId");
+    const groupId = url.searchParams.get("groupId");
+    
+    if (!clerkId) {
+      return new Response(JSON.stringify(createError("Invalid user ID", 400, false)), { status: 400 });
+    }
+    
+    const userInfo = await User.findOne({ clerkId: clerkId });
+    if (!userInfo) {
+      return new Response(JSON.stringify(createError("User not found", 404, false)), { status: 404 });
+    }
 
+    const userId = userInfo._id;
+    
     if (!groupId || !memberId) {
       return new Response(JSON.stringify(createError("Invalid group ID or member ID", 400, false)), { status: 400 });
     }
 
     if (!isValidObjectId(groupId) || !isValidObjectId(memberId)) {
       return new Response(JSON.stringify(createError("Invalid group ID or member ID", 400, false)), { status: 400 });
-    }
-
-    const url = new URL(request.url);
-    const userId = url.searchParams.get("userId");
-
-    if (!userId || !mongoose.isValidObjectId(userId)) {
-      return new Response(JSON.stringify(createError("Invalid user ID", 400, false)), { status: 400 });
-    }
-
-    const userInfo = await User.findOne({ clerkId: userId });
-    if (!userInfo) {
-      return new Response(JSON.stringify(createError("User not found", 404, false)), { status: 404 });
     }
 
     const group = await Group.findById(groupId);

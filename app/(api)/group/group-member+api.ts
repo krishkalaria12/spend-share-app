@@ -23,13 +23,8 @@ export async function POST(request: Request) {
         // Get the memberIds from the request body
         const { memberIds } = await request.json();
 
-        if (!userId || !groupId) {
+        if (!userId || !groupId || !mongoose.isValidObjectId(groupId)) {
             throw createError("Invalid group ID or User ID", 400, false);
-        }
-
-        // Validate Group and User IDs
-        if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(userId)) {
-            throw createError("Invalid group or user ID", 400, false);
         }
 
         // Retrieve the user info from the database

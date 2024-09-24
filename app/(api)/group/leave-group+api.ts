@@ -25,7 +25,7 @@ export async function DELETE(request: Request) {
             return new Response(JSON.stringify(createError("Invalid group ID", 400, false)), { status: 400 });
         }
 
-        if (!userId || !mongoose.isValidObjectId(userId)) {
+        if (!userId) {
             return new Response(JSON.stringify(createError("Invalid user ID", 400, false)), { status: 400 });
         }
 

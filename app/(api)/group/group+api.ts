@@ -149,13 +149,13 @@ export async function GET(request: Request) {
         const url = new URL(request.url)
         const groupId = url.searchParams.get('groupId');
         const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
-        const userId = url.searchParams.get('userId');
+        const clerkId = url.searchParams.get('userId');
 
-        if (!sessionToken || !userId || !mongoose.isValidObjectId(userId)) {
+        if (!sessionToken || !clerkId) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const userInfo = await User.findOne({ clerkId: userId });
+        const userInfo = await User.findOne({ clerkId: clerkId });
         if (!userInfo) {
             throw createError("User not found", 404, false);
         }
@@ -164,6 +164,8 @@ export async function GET(request: Request) {
         if (!groupId || !mongoose.isValidObjectId(groupId)) {
             throw createError("Invalid group ID", 400, false);
         }
+
+        const userId = userInfo?._id;
 
         // MongoDB aggregation pipeline to fetch group details
         const group = await Group.aggregate([

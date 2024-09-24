@@ -3,6 +3,7 @@ import { Transaction } from "@/models/transaction.models";
 import mongoose from "mongoose";
 import { createError } from "@/utils/createError";
 import { createResponse } from "@/utils/ApiResponse";
+import User from "@/models/user.models";
 
 export async function GET(request: Request) {
   await connect();
@@ -20,12 +21,19 @@ export async function GET(request: Request) {
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
-    const userId = url.searchParams.get('userId');
+    const clerkId = url.searchParams.get('userId');
 
     // Validate userId and groupId
-    if (!userId || !mongoose.isValidObjectId(userId) || !groupId || !mongoose.isValidObjectId(groupId)) {
+    if (!clerkId || !groupId || !mongoose.isValidObjectId(groupId)) {
       throw createError("Invalid user ID or group ID", 400, false);
     }
+
+    const userInfo = await User.findOne({ clerkId: clerkId });
+    if (!userInfo) {
+      throw createError("User not found", 404, false);
+    }
+
+    const userId = userInfo?._id;
 
     // Query to fetch transactions for the group
     const transactions = await Transaction.aggregate([

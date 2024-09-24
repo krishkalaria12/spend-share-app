@@ -5,7 +5,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { getAllGroups } from "@/actions/group.actions";
 import { GroupCard } from "@/components/group/GroupCard";
 import Toast from 'react-native-toast-message';
-import { useRouter } from 'expo-router'; // You can also use React Navigation
+import { Link, useRouter } from 'expo-router'; // You can also use React Navigation
 import { Group } from "@/types/types"; // Import your types here
 import ServerError from "@/components/ServerError";
 import { images } from "@/constants";
@@ -25,12 +25,14 @@ const GroupPage: React.FC = () => {
     retry: false,
   });
 
+  console.log(groups);
+
   if (loadingGroups) {
     return (
         <SafeAreaView className="flex-1 justify-center items-center bg-gray-100">
           <View className="flex items-center justify-center">
             <ActivityIndicator size="large" color="#3b82f6" />
-            <Text className="mt-4 text-lg font-semibold text-gray-600">Loading expenses...</Text>
+            <Text className="mt-4 text-lg font-semibold text-gray-600">Loading your groups...</Text>
           </View>
         </SafeAreaView>
       );
@@ -39,12 +41,7 @@ const GroupPage: React.FC = () => {
   if (isError) {
     return (
         <SafeAreaView className="flex-1 bg-gray-100 pt-4">
-          <ScrollView
-            className="flex-1 px-4"
-            // refreshControl={
-            //   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            // }
-          >
+          <ScrollView className="flex-1 px-4">
             <ServerError />
             <Text className="mt-4 text-center text-lg font-semibold text-gray-600">
               Pull to refresh and try again!
@@ -56,7 +53,7 @@ const GroupPage: React.FC = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 80, paddingTop: 50 }}>
         {/* Header */}
         <View className={`flex-row ${groups && groups.length > 0 ? "justify-between" : "justify-end"}`}>
           {groups && groups.length > 0 && (
@@ -66,7 +63,7 @@ const GroupPage: React.FC = () => {
           )}
           {/* Create Group Button */}
           <TouchableOpacity
-            // onPress={() => router.push("/group/create")}
+            onPress={() => router.push("/group/create")}
             className="bg-primary-500 p-3 rounded-full"
           >
             <Text className="text-white font-semibold">Create Group</Text>
@@ -78,7 +75,11 @@ const GroupPage: React.FC = () => {
           {groups && groups.length > 0 ? (
             <View className="grid grid-cols-2 gap-4">
               {groups.map((group) => (
-                <GroupCard key={group._id} group={group} />
+                <Link href={`/group/${group._id}`} asChild key={group._id}>
+                  <TouchableOpacity className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 m-4">
+                    <GroupCard group={group} />
+                  </TouchableOpacity>
+                </Link>
               ))}
             </View>
           ) : (
