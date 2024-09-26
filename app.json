@@ -32,7 +32,13 @@
       [
         "expo-router",
         {
-          "origin": "https://spendshare.vercel.app/"
+          "origin": "https://spendshare.vercel.app"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with your friends."
         }
       ]
     ],

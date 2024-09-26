@@ -16,7 +16,7 @@ export async function DELETE(request: Request) {
             return new Response(JSON.stringify(createError("Unauthorized", 401, false)), { status: 401 });
         }
         
-        // Validate and extract the group ID from the URL
+        // Validate and extract the group ID and user ID from the URL
         const url = new URL(request.url);
         const userId = url.searchParams.get("userId");
         const groupId = url.searchParams.get("groupId");
@@ -29,13 +29,13 @@ export async function DELETE(request: Request) {
             return new Response(JSON.stringify(createError("Invalid user ID", 400, false)), { status: 400 });
         }
 
-        // Check if the user exists in the database
+        // Query the user by their Clerk ID, not MongoDB ObjectId
         const userInfo = await User.findOne({ clerkId: userId });
         if (!userInfo) {
             return new Response(JSON.stringify(createError("User not found", 404, false)), { status: 404 });
         }
 
-        const mongoUserId = new mongoose.Types.ObjectId(userInfo._id);
+        const mongoUserId = userInfo._id; // MongoDB ObjectId from the User model
 
         // Find the group by group ID
         const group = await Group.findById(groupId);
@@ -50,20 +50,20 @@ export async function DELETE(request: Request) {
 
         // Check if the leaving member is the admin
         if (group.admin.equals(mongoUserId)) {
-            // If the leaving member is the admin, transfer admin role to another member
+            // If the leaving member is the admin, transfer the admin role to another member
             const newAdminId = group.members.find(memberId => !memberId.equals(mongoUserId));
             if (!newAdminId) {
                 return new Response(JSON.stringify(createError("Failed to leave group: No alternative admin found", 500, false)), { status: 500 });
             }
             group.admin = newAdminId;
         }
-
+        
         // Remove the user from the group members
         group.members = group.members.filter(memberId => !memberId.equals(mongoUserId));
         await group.save();
-
+        
         // Remove the group from the user's list of groups
-        await User.findByIdAndUpdate(userId, { $pull: { groups: groupId } });
+        await User.findByIdAndUpdate(userInfo._id, { $pull: { groups: groupId } });
 
         // Return success response
         return new Response(

@@ -73,6 +73,9 @@ const GroupId = () => {
     );
   }
 
+  console.log(group);
+  
+
   return (
     <SafeAreaView className="flex-1 bg-primary-100">
       <Animated.ScrollView 

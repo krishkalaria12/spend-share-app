@@ -1,4 +1,4 @@
-import { Owe } from "@/types/types";
+import { Owe, OweCreation } from "@/types/types";
 
 export const getOwesToUsers = async (token: string, userId: string): Promise<Owe[]> => {
     if (!token || !userId) {
@@ -115,3 +115,33 @@ export const deleteOwe = async (
         throw error;
     }
 }
+
+export const askMoneyFromFriend = async (
+    token: string,
+    userId: string,
+    friendId: string,
+    data: OweCreation
+): Promise<Owe> => {
+    if (!token || !userId) {
+        throw new Error("Authentication required");
+    }
+
+    const response = await fetch(
+        `/(api)/owe/ask-money-from-friend/?userId=${userId}&friendId=${friendId}`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(data),
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Failed to ask money from friend");
+    }
+
+    const res = await response.json();
+    return res.data;
+};

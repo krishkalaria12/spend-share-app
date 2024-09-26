@@ -6,7 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar } from 'react-native';
 import { envKeys } from '@/lib/env';
 import Toast from 'react-native-toast-message';
 
@@ -51,7 +51,7 @@ export default function RootLayout() {
       <ClerkLoaded>
         <QueryClientProvider client={queryClient}>
           <Stack>
-            <StatusBar style="auto" />
+            <StatusBar barStyle="dark-content" />
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(root)" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />

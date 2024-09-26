@@ -137,6 +137,7 @@ export const removeMember = async (userId: string, groupId: string, memberId: st
     },
   });
   if (!response.ok) throw new Error('Failed to remove member');
+  console.log("Successfully removed")
   return response.json();
 };
 
@@ -151,5 +152,20 @@ export const makeAdmin = async (userId: string, groupId: string, memberId: strin
     },
   });
   if (!response.ok) throw new Error('Failed to make admin');
+  return response.json();
+};
+
+export const createGroupByValues = async (data: FormData, token: string | null, userId: string | null | undefined) => {
+  if (!token || !userId) {
+    throw new Error("Authentication required");
+  }
+  const response = await fetch(`/(api)/group/group/?userId=${userId}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: data,
+  });
+  if (!response.ok) throw new Error('Failed to create group');
   return response.json();
 };

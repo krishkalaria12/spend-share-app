@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, FlatList, Animated, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, FlatList, Animated, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { Group, Friend } from '@/types/types';
@@ -8,6 +8,7 @@ import { addMemberToGroup, leaveGroup, removeMember, makeAdmin } from '@/actions
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Toast from 'react-native-toast-message'; // Importing Toast for notifications
 
 const GroupDetails = () => {
   const { id, group: groupString } = useLocalSearchParams<{ id: string; group: string }>();
@@ -16,6 +17,7 @@ const GroupDetails = () => {
   const { getToken, userId } = useAuth();
   const queryClient = useQueryClient();
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [localMembers, setLocalMembers] = useState(group.members);  // Manual update for members
   const router = useRouter();
 
   // Animation values
@@ -38,16 +40,30 @@ const GroupDetails = () => {
     ]).start();
   }, []);
 
-  // Mutations (same as before)
+  // Mutations
   const addMemberMutation = useMutation({
     mutationFn: async (memberIds: string[]) => {
       const token = await getToken();
       if (!token || !userId) throw new Error("Authentication required");
-      return addMemberToGroup(userId, id, memberIds, token);
+      return addMemberToGroup(userId, group._id, memberIds, token);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['group', id] })
+      queryClient.invalidateQueries({ queryKey: ['group', id] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
       setSelectedMembers([]);
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Members added to the group!',
+      });
+    },
+    onError: (error) => {
+      console.error(error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to add members. Please try again.',
+      });
     },
   });
 
@@ -55,11 +71,26 @@ const GroupDetails = () => {
     mutationFn: async () => {
       const token = await getToken();
       if (!token || !userId) throw new Error("Authentication required");
-      return leaveGroup(userId, id, token);
+      return leaveGroup(userId, group._id, token);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups'] });
-      router.push('/group');
+      Toast.show({
+        type: 'success',
+        text1: 'Left Group',
+        text2: 'You have left the group successfully.',
+      });
+      setTimeout(() => {
+        router.push('/(root)/(tabs)/group');
+      }, 1000);
+    },
+    onError: (error) => {
+      console.error(error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to leave the group. Please try again.',
+      });
     },
   });
 
@@ -67,23 +98,60 @@ const GroupDetails = () => {
     mutationFn: async (memberId: string) => {
       const token = await getToken();
       if (!token || !userId) throw new Error("Authentication required");
-      return removeMember(userId, id, memberId, token);
+      return removeMember(userId, group._id, memberId, token);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['group', id] })
+    onMutate: (memberId: string) => {
+      // Manually remove the member from the local members array
+      setLocalMembers(prev => prev.filter(member => member._id !== memberId));
+    },
+    onError: (err, memberId, context) => {
+      // Revert back if there was an error
+      setLocalMembers(group.members);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to remove member. Please try again.',
+      });
+    },
+    onSuccess: () => {
+      Toast.show({
+        type: 'success',
+        text1: 'Member Removed',
+        text2: 'The member was removed from the group.',
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['group', id] });
+    },
   });
 
   const makeAdminMutation = useMutation({
     mutationFn: async (memberId: string) => {
       const token = await getToken();
       if (!token || !userId) throw new Error("Authentication required");
-      return makeAdmin(userId, id, memberId, token);
+      return makeAdmin(userId, group._id, memberId, token);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['group', id] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['group', id] });
+      Toast.show({
+        type: 'success',
+        text1: 'Admin Updated',
+        text2: 'A new admin was assigned.',
+      });
+      router.back();
+    },
+    onError: (error) => {
+      console.error(error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to make admin. Please try again.',
+      });
+    },
   });
 
   return (
     <SafeAreaView className="flex-1 bg-primary-100">
-      <StatusBar barStyle="light-content" />
       <ScrollView className="flex-1">
         <LinearGradient
           colors={['#0286FF', '#0250FF']}
@@ -126,9 +194,16 @@ const GroupDetails = () => {
               />
               <TouchableOpacity 
                 onPress={() => addMemberMutation.mutate(selectedMembers)} 
-                className="bg-primary-500 py-4 px-6 rounded-full mt-6 shadow-md active:bg-primary-600 transition-colors duration-200"
+                className={`bg-primary-500 py-4 px-6 rounded-full mt-6 shadow-md active:bg-primary-600 transition-colors ${leaveGroupMutation.isPending ? 'bg-primary-300' : 'bg-primary-500'} duration-200`}
               >
-                <Text className="text-white text-center font-JakartaBold">Add Selected Members</Text>
+                {addMemberMutation.isPending ? (
+                  <View className='flex justify-center flex-row gap-4 items-center'>
+                    <ActivityIndicator color="#FFF" />
+                    <Text className='text-white text-center font-JakartaBold'>Adding Members...</Text>
+                  </View>
+                ) : (
+                  <Text className="text-white text-center font-JakartaBold">Add Selected Members</Text>
+                )}
               </TouchableOpacity>
             </Animated.View>
           )}
@@ -137,7 +212,7 @@ const GroupDetails = () => {
           <Animated.View className="bg-white rounded-2xl p-6 shadow-lg mb-8" style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
             <Text className="text-xl font-JakartaBold text-primary-900 mb-4">Members</Text>
             <FlatList 
-              data={group.members} 
+              data={localMembers} // Local members for manual update
               renderItem={({ item }) => (
                 <View className="flex-row justify-between items-center py-4 border-b border-primary-200">
                   <View className="flex-row items-center">
@@ -149,18 +224,24 @@ const GroupDetails = () => {
                   </View>
                   {group.isAdmin && userId !== item._id && (
                     <View className="flex-row">
-                      <TouchableOpacity 
-                        onPress={() => removeMemberMutation.mutate(item._id)} 
-                        className="bg-danger-100 p-2 rounded-full mr-2 active:bg-danger-200 transition-colors duration-200"
-                      >
-                        <Ionicons name="person-remove" size={20} color="#E53E3E" />
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        onPress={() => makeAdminMutation.mutate(item._id)} 
-                        className="bg-primary-100 p-2 rounded-full active:bg-primary-200 transition-colors duration-200"
-                      >
-                        <MaterialIcons name="admin-panel-settings" size={20} color="#0286FF" />
-                      </TouchableOpacity>
+                      {/* Remove Member */}
+                      {!item.isAdmin && (
+                        <TouchableOpacity 
+                          onPress={() => removeMemberMutation.mutate(item._id)} 
+                          className="bg-danger-100 p-2 rounded-full mr-2 active:bg-danger-200 transition-colors duration-200"
+                        >
+                          <Ionicons name="person-remove" size={20} color="#E53E3E" />
+                        </TouchableOpacity>
+                      )}
+                      {/* Make Admin */}
+                      {!item.isAdmin && (
+                        <TouchableOpacity 
+                          onPress={() => makeAdminMutation.mutate(item._id)} 
+                          className="bg-primary-100 p-2 rounded-full active:bg-primary-200 transition-colors duration-200"
+                        >
+                          <MaterialIcons name="admin-panel-settings" size={20} color="#0286FF" />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   )}
                 </View>
@@ -172,12 +253,21 @@ const GroupDetails = () => {
           {/* Leave Group */}
           <TouchableOpacity 
             onPress={() => leaveGroupMutation.mutate()} 
-            className="bg-danger-500 py-4 px-6 rounded-full shadow-lg active:bg-danger-600 transition-colors duration-200 mb-12"
+            className={`py-4 px-6 rounded-full shadow-lg transition-colors duration-200 mb-12 ${leaveGroupMutation.isPending ? 'bg-danger-300' : 'bg-danger-500'}`} 
+            disabled={leaveGroupMutation.isPending}
           >
-            <Text className="text-white text-center font-JakartaBold">Leave Group</Text>
+            {leaveGroupMutation.isPending ? (
+              <View className='flex justify-center flex-row gap-4 items-center'>
+                <ActivityIndicator color="#FFF" />
+                <Text className='text-white text-center font-JakartaBold'>Leaving...</Text>
+              </View>
+            ) : (
+              <Text className="text-white text-center font-JakartaBold">Leave Group</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <Toast />
     </SafeAreaView>
   );
 };

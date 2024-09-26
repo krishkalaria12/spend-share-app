@@ -167,6 +167,9 @@ export async function DELETE(request: Request) {
       __v: updatedGroup.__v,
     };
 
+    console.log("Final response from API: ", response);
+    
+
     return new Response(
       JSON.stringify(createResponse("Successfully removed member from group", 200, true, response)),
       { status: 200 }

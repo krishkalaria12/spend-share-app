@@ -14,13 +14,15 @@ import friend from "@/assets/icons/friend.png";
 import group from "@/assets/icons/group.png";
 import askFriend from "@/assets/icons/askFriend.png";
 import feedback from "@/assets/icons/feedback.png";
+import friends from "@/assets/images/friend.png";
 
 export const images = {
   onboarding1,
   onboarding2,
   onboarding3,
   signUpImage,
-  groupNotFound
+  groupNotFound,
+  friends
 };
 
 export const icons = {

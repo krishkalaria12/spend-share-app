@@ -217,6 +217,9 @@ const FriendPage = () => {
     );
   }
 
+  console.log(friendsData);
+  
+
   return (
     <SafeAreaView className="flex-1 bg-primary-100 pt-6">
       <ScrollView

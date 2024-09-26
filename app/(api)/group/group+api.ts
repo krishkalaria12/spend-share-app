@@ -24,15 +24,17 @@ export async function POST(request: Request) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const userId = url.searchParams.get('userId');
-        if (!userId || !mongoose.isValidObjectId(userId)) {
+        const clerkId = url.searchParams.get('userId');
+        if (!clerkId) {
             throw createError("Unauthorized", 401, false);
         }
 
-        const userInfo = await User.findOne({ clerkId: userId });
+        const userInfo = await User.findOne({ clerkId: clerkId });
         if (!userInfo) {
             throw createError("User not found", 404, false);
         }
+
+        const userId = userInfo?._id;
 
         if (!name || !description) {
             throw createError("Invalid group name or description", 400, false);
@@ -146,7 +148,7 @@ export async function GET(request: Request) {
     await connect();
 
     try {
-        const url = new URL(request.url)
+        const url = new URL(request.url);
         const groupId = url.searchParams.get('groupId');
         const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
         const clerkId = url.searchParams.get('userId');
@@ -160,14 +162,13 @@ export async function GET(request: Request) {
             throw createError("User not found", 404, false);
         }
 
-        // Validate group ID
         if (!groupId || !mongoose.isValidObjectId(groupId)) {
             throw createError("Invalid group ID", 400, false);
         }
 
-        const userId = userInfo?._id;
+        const userId = userInfo._id;
 
-        // MongoDB aggregation pipeline to fetch group details
+        // MongoDB aggregation pipeline to fetch group details along with friends not in the group
         const group = await Group.aggregate([
             {
                 $match: { _id: new mongoose.Types.ObjectId(groupId) }
@@ -219,16 +220,17 @@ export async function GET(request: Request) {
                     isAdmin: { $eq: ["$admin._id", new mongoose.Types.ObjectId(userId)] }
                 }
             },
+            // Fetch fulfilled friendships for the user and filter out friends already in the group
             {
                 $lookup: {
                     from: "friendships",
-                    let: { adminId: "$admin._id" },
+                    let: { userId: userId },
                     pipeline: [
                         {
                             $match: {
                                 $expr: {
                                     $and: [
-                                        { $eq: ["$user", "$$adminId"] },
+                                        { $eq: ["$user", "$$userId"] },
                                         { $eq: ["$status", "fulfilled"] }
                                     ]
                                 }
@@ -244,17 +246,29 @@ export async function GET(request: Request) {
                         },
                         { $unwind: "$friendDetails" }
                     ],
-                    as: "adminFriends"
+                    as: "userFriends"
                 }
             },
+            // Correctly filter friends not part of the group
             {
                 $addFields: {
                     friendsNotInGroup: {
                         $filter: {
-                            input: "$adminFriends",
+                            input: "$userFriends",
                             as: "friend",
                             cond: {
-                                $not: { $in: ["$$friend.friendDetails._id", "$members._id"] }
+                                $not: {
+                                    $in: [
+                                        "$$friend.friendDetails._id",
+                                        {
+                                            $map: {
+                                                input: "$members",
+                                                as: "member",
+                                                in: "$$member._id"
+                                            }
+                                        }
+                                    ]
+                                }
                             }
                         }
                     }
@@ -262,13 +276,7 @@ export async function GET(request: Request) {
             },
             {
                 $addFields: {
-                    friends: {
-                        $cond: {
-                            if: "$isAdmin",
-                            then: "$friendsNotInGroup",
-                            else: []
-                        }
-                    }
+                    friends: "$friendsNotInGroup"
                 }
             },
             {
@@ -293,11 +301,11 @@ export async function GET(request: Request) {
                             input: "$friends",
                             as: "friend",
                             in: {
+                                _id: "$$friend.friendDetails._id",
                                 username: "$$friend.friendDetails.username",
                                 email: "$$friend.friendDetails.email",
                                 fullName: "$$friend.friendDetails.fullName",
-                                avatar: "$$friend.friendDetails.avatar",
-                                _id: "$$friend.friendDetails._id"
+                                avatar: "$$friend.friendDetails.avatar"
                             }
                         }
                     },

@@ -50,6 +50,20 @@ const RootLayout = () => {
           ),
         }}
       />
+      <Stack.Screen 
+        name="group/create"
+        options={{
+          title: 'Create',
+          headerBackTitle: '',
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#F5F5F5' }, 
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={34} color={'#141518'} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
     </Stack>
   );
 };
