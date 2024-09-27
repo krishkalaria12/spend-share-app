@@ -8,6 +8,7 @@ import { MoneyOwedList } from '@/components/owe/MoneyOwedList';
 import Toast from 'react-native-toast-message';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 const AskFriendPage = () => {
   const { getToken, userId } = useAuth();
@@ -17,6 +18,7 @@ const AskFriendPage = () => {
   const [activeTab, setActiveTab] = useState('pendingOwes');
   const [activeMoneyOwedTab, setActiveMoneyOwedTab] = useState('pendingMoneyOwed');
   const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter();
 
   const fetchOwes = async () => {
     const token = await getToken();
@@ -147,7 +149,7 @@ const AskFriendPage = () => {
         >
           <View className="flex-row justify-between items-center mb-6">
             <Text className="text-2xl w-4/5 font-JakartaBold text-primary-900">Your Money Management</Text>
-            <TouchableOpacity className="bg-primary-500 p-3 rounded-full shadow-md">
+            <TouchableOpacity onPress={() => router.push("/(root)/ask-friend-money/ask")} className="bg-primary-500 p-3 rounded-full shadow-md">
               <Feather name="plus" size={24} color="white" />
             </TouchableOpacity>
           </View>

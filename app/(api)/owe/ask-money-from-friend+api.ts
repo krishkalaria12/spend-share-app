@@ -16,7 +16,8 @@ export async function POST(request: Request) {
         const friendId = url.searchParams.get('friendId');
         const userId = url.searchParams.get('userId');
         const sessionToken = request.headers.get('Authorization')?.split(' ')[1];
-
+        console.log(friendId, userId, sessionToken);
+        
         if (!sessionToken || !userId) {
             throw createError("Unauthorized", 401, false);
         }
@@ -31,10 +32,10 @@ export async function POST(request: Request) {
             throw createError("User not found", 404, false);
         }
 
-        const mongoId = new mongoose.Types.ObjectId(userInfo._id);
+        const mongoId = userInfo?._id;
         const username = userInfo?.username;
 
-        if (!userId || !mongoose.isValidObjectId(userId) || !friendId || !mongoose.isValidObjectId(friendId)) {
+        if (!userId || !friendId || !mongoose.isValidObjectId(friendId)) {
             throw createError("Invalid user ID or friendId", 400, false);
         }
 
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
         // Create an Owe record
         const owe = await Owe.create({
             debtor: friendId,
-            creditor: userId,
+            creditor: mongoId,
             category,
             amount,
             title,
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
         }
 
         const transaction = await Transaction.create({
-            userId, // Ensure userId is included here
+            userId: mongoId,
             category,
             amount,
             title,

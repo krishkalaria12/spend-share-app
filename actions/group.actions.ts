@@ -1,4 +1,5 @@
 import { Group } from "@/types/types";
+import { RequestMoneyFormData } from "@/app/(root)/group/request-money";
 
 export async function getAllGroups(
   token: string,
@@ -167,5 +168,21 @@ export const createGroupByValues = async (data: FormData, token: string | null, 
     body: data,
   });
   if (!response.ok) throw new Error('Failed to create group');
+  return response.json();
+};
+
+export const requestMoneyFromGroup = async (userId: string, groupId: string, token: string, formData: RequestMoneyFormData) => {
+  if (!token || !userId) {
+    throw new Error("Authentication required");
+  }
+  const response = await fetch(`/(api)/group/request-money-from-group/?userId=${userId}&groupId=${groupId}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(formData),
+  });
+  if (!response.ok) throw new Error("Failed to request money from group");
   return response.json();
 };
