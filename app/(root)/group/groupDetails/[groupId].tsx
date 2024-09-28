@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, FlatList, Animated, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, FlatList, Animated, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { Group, Friend } from '@/types/types';
@@ -8,19 +8,18 @@ import { addMemberToGroup, leaveGroup, removeMember, makeAdmin } from '@/actions
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Toast from 'react-native-toast-message'; // Importing Toast for notifications
+import Toast from 'react-native-toast-message';
 
 const GroupDetails = () => {
   const { id, group: groupString } = useLocalSearchParams<{ id: string; group: string }>();
-  const group: Group = JSON.parse(groupString);
+  const group: Group = useMemo(() => JSON.parse(groupString), [groupString]);
   
   const { getToken, userId } = useAuth();
   const queryClient = useQueryClient();
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  const [localMembers, setLocalMembers] = useState(group.members);  // Manual update for members
+  const [localMembers, setLocalMembers] = useState(group.members);
   const router = useRouter();
 
-  // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
@@ -40,7 +39,6 @@ const GroupDetails = () => {
     ]).start();
   }, []);
 
-  // Mutations
   const addMemberMutation = useMutation({
     mutationFn: async (memberIds: string[]) => {
       const token = await getToken();
@@ -101,11 +99,9 @@ const GroupDetails = () => {
       return removeMember(userId, group._id, memberId, token);
     },
     onMutate: (memberId: string) => {
-      // Manually remove the member from the local members array
       setLocalMembers(prev => prev.filter(member => member._id !== memberId));
     },
     onError: (err, memberId, context) => {
-      // Revert back if there was an error
       setLocalMembers(group.members);
       Toast.show({
         type: 'error',
@@ -150,6 +146,62 @@ const GroupDetails = () => {
     },
   });
 
+  const handleAddMembers = useCallback(() => {
+    addMemberMutation.mutate(selectedMembers);
+  }, [addMemberMutation, selectedMembers]);
+
+  const handleLeaveGroup = useCallback(() => {
+    leaveGroupMutation.mutate();
+  }, [leaveGroupMutation]);
+
+  const handleRemoveMember = useCallback((memberId: string) => {
+    removeMemberMutation.mutate(memberId);
+  }, [removeMemberMutation]);
+
+  const handleMakeAdmin = useCallback((memberId: string) => {
+    makeAdminMutation.mutate(memberId);
+  }, [makeAdminMutation]);
+
+  const renderMemberItem = useCallback(({ item }: { item: Group['members'][0] }) => (
+    <View className="flex-row justify-between items-center py-4 border-b border-primary-200">
+      <View className="flex-row items-center">
+        <Image source={{ uri: item.avatar }} className="w-12 h-12 rounded-full mr-4" />
+        <View>
+          <Text className="font-JakartaSemiBold text-primary-800 text-base">{item.username}</Text>
+          <Text className="font-JakartaMedium text-primary-600 text-sm">{item.isAdmin ? 'Admin' : 'Member'}</Text>
+        </View>
+      </View>
+      {group.isAdmin && userId !== item._id && (
+        <View className="flex-row">
+          {!item.isAdmin && (
+            <TouchableOpacity 
+              onPress={() => handleRemoveMember(item._id)} 
+              className="bg-danger-100 p-2 rounded-full mr-2 active:bg-danger-200 transition-colors duration-200"
+            >
+              <Ionicons name="person-remove" size={20} color="#E53E3E" />
+            </TouchableOpacity>
+          )}
+          {!item.isAdmin && (
+            <TouchableOpacity 
+              onPress={() => handleMakeAdmin(item._id)} 
+              className="bg-primary-100 p-2 rounded-full active:bg-primary-200 transition-colors duration-200"
+            >
+              <MaterialIcons name="admin-panel-settings" size={20} color="#0286FF" />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </View>
+  ), [group.isAdmin, userId, handleRemoveMember, handleMakeAdmin]);
+
+  const memoizedMemberList = useMemo(() => (
+    <FlatList
+      data={localMembers}
+      renderItem={renderMemberItem}
+      keyExtractor={item => item._id}
+    />
+  ), [localMembers, renderMemberItem]);
+
   return (
     <SafeAreaView className="flex-1 bg-primary-100">
       <ScrollView className="flex-1">
@@ -174,7 +226,6 @@ const GroupDetails = () => {
         </LinearGradient>
 
         <View className="px-6 pt-8">
-          {/* Add Members */}
           {group.isAdmin && (
             <Animated.View className="mb-8 bg-white rounded-2xl p-6 shadow-lg" style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
               <Text className="text-xl font-JakartaBold text-primary-900 mb-4">Add Members</Text>
@@ -193,8 +244,9 @@ const GroupDetails = () => {
                 tagTextColor="#0286FF"
               />
               <TouchableOpacity 
-                onPress={() => addMemberMutation.mutate(selectedMembers)} 
-                className={`bg-primary-500 py-4 px-6 rounded-full mt-6 shadow-md active:bg-primary-600 transition-colors ${leaveGroupMutation.isPending ? 'bg-primary-300' : 'bg-primary-500'} duration-200`}
+                onPress={handleAddMembers} 
+                className={`bg-primary-500 py-4 px-6 rounded-full mt-6 shadow-md active:bg-primary-600 transition-colors ${addMemberMutation.isPending ? 'bg-primary-300' : 'bg-primary-500'} duration-200`}
+                disabled={addMemberMutation.isPending}
               >
                 {addMemberMutation.isPending ? (
                   <View className='flex justify-center flex-row gap-4 items-center'>
@@ -208,51 +260,13 @@ const GroupDetails = () => {
             </Animated.View>
           )}
 
-          {/* Members */}
           <Animated.View className="bg-white rounded-2xl p-6 shadow-lg mb-8" style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
             <Text className="text-xl font-JakartaBold text-primary-900 mb-4">Members</Text>
-            <FlatList 
-              data={localMembers} // Local members for manual update
-              renderItem={({ item }) => (
-                <View className="flex-row justify-between items-center py-4 border-b border-primary-200">
-                  <View className="flex-row items-center">
-                    <Image source={{ uri: item.avatar }} className="w-12 h-12 rounded-full mr-4" />
-                    <View>
-                      <Text className="font-JakartaSemiBold text-primary-800 text-base">{item.username}</Text>
-                      <Text className="font-JakartaMedium text-primary-600 text-sm">{item.isAdmin ? 'Admin' : 'Member'}</Text>
-                    </View>
-                  </View>
-                  {group.isAdmin && userId !== item._id && (
-                    <View className="flex-row">
-                      {/* Remove Member */}
-                      {!item.isAdmin && (
-                        <TouchableOpacity 
-                          onPress={() => removeMemberMutation.mutate(item._id)} 
-                          className="bg-danger-100 p-2 rounded-full mr-2 active:bg-danger-200 transition-colors duration-200"
-                        >
-                          <Ionicons name="person-remove" size={20} color="#E53E3E" />
-                        </TouchableOpacity>
-                      )}
-                      {/* Make Admin */}
-                      {!item.isAdmin && (
-                        <TouchableOpacity 
-                          onPress={() => makeAdminMutation.mutate(item._id)} 
-                          className="bg-primary-100 p-2 rounded-full active:bg-primary-200 transition-colors duration-200"
-                        >
-                          <MaterialIcons name="admin-panel-settings" size={20} color="#0286FF" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-                </View>
-              )} 
-              keyExtractor={item => item._id} 
-            />
+            {memoizedMemberList}
           </Animated.View>
 
-          {/* Leave Group */}
           <TouchableOpacity 
-            onPress={() => leaveGroupMutation.mutate()} 
+            onPress={handleLeaveGroup} 
             className={`py-4 px-6 rounded-full shadow-lg transition-colors duration-200 mb-12 ${leaveGroupMutation.isPending ? 'bg-danger-300' : 'bg-danger-500'}`} 
             disabled={leaveGroupMutation.isPending}
           >
@@ -272,4 +286,4 @@ const GroupDetails = () => {
   );
 };
 
-export default GroupDetails;
+export default React.memo(GroupDetails);
