@@ -11,8 +11,17 @@ import { ExpenseCategoryTabs } from '@/components/expense/ListExpense';
 import { ChartPieIcon, PlusIcon, TrashIcon } from 'react-native-heroicons/outline';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import { StatusBar } from 'react-native';
 
-const Expense = () => {
+interface ExpenseCategory {
+  category: string;
+  totalExpense: number;
+  totalPages: number;
+  currentPage: number;
+  expenses: any[];
+}
+
+const Expense: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('Food');
   const [refreshing, setRefreshing] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -22,40 +31,38 @@ const Expense = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  // Fetch all expenses
+  const fetchExpenses = useCallback(async () => {
+    const token = await getToken();
+    if (!token || !userId) throw new Error("Authentication required");
+    return getAllExpenses(token, userId);
+  }, [getToken, userId]);
+
   const { data: expensesData, isLoading: loadingExpenses, isError: errorExpenses, refetch: refetchExpenses } = useQuery({
     queryKey: ['expenses'],
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token || !userId) {
-        throw new Error("Authentication required");
-      }
-      return getAllExpenses(token, userId);
-    },
+    queryFn: fetchExpenses,
     retry: false,
   });
 
-  // Fetch expense comparison
+  const fetchExpenseComparison = useCallback(async () => {
+    const token = await getToken();
+    if (!token || !userId) throw new Error("Authentication required");
+    return getExpenseComparison(token, userId);
+  }, [getToken, userId]);
+
   const { data: expenseComparison, isLoading: loadingComparison, isError: errorComparison, refetch: refetchComparison } = useQuery({
     queryKey: ['expense-comparison'],
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token || !userId) {
-        throw new Error("Authentication required");
-      }
-      return getExpenseComparison(token, userId);
-    },
+    queryFn: fetchExpenseComparison,
     retry: false,
   });
 
-  const handleDeleteAll = () => {
+  const handleDeleteAll = useCallback(() => {
     setDeleteModalVisible(true);
-  };
+  }, []);
 
-  const confirmDeleteAll = () => {
+  const confirmDeleteAll = useCallback(() => {
     setDeleteModalVisible(false);
     deleteAllMutation.mutate();
-  };
+  }, []);
 
   const deleteAllMutation = useMutation({
     mutationFn: async () => {
@@ -86,16 +93,16 @@ const Expense = () => {
     Promise.all([refetchExpenses(), refetchComparison()]).finally(() => setRefreshing(false));
   }, [refetchExpenses, refetchComparison]);
 
-  const handlePageChange = async (newPage: number) => {
-    const activeCategoryData = expensesData?.expenses.find((cat: { category: string; }) => cat.category === activeCategory);
+  const handlePageChange = useCallback(async (newPage: number) => {
+    const activeCategoryData = expensesData?.expenses.find((cat: ExpenseCategory) => cat.category === activeCategory);
     
     if (!activeCategoryData) return;
 
-    // If we're moving to a page we've already loaded, don't fetch new data
-    if (newPage <= activeCategoryData.currentPage) {
+    // If we've already loaded this page, don't fetch new data
+    if (activeCategoryData.expenses[(newPage - 1) * 10]) {
       queryClient.setQueryData(['expenses'], (oldData: any) => ({
         ...oldData,
-        expenses: oldData.expenses.map((cat: any) => 
+        expenses: oldData.expenses.map((cat: ExpenseCategory) => 
           cat.category === activeCategory 
             ? { ...cat, currentPage: newPage }
             : cat
@@ -113,12 +120,16 @@ const Expense = () => {
       const newExpenses = await getExpensePagination(newPage, 10, token, userId, activeCategory);
       queryClient.setQueryData(['expenses'], (oldData: any) => ({
         ...oldData,
-        expenses: oldData.expenses.map((cat: any) => 
+        expenses: oldData.expenses.map((cat: ExpenseCategory) => 
           cat.category === activeCategory 
             ? { 
                 ...cat, 
                 currentPage: newPage, 
-                expenses: [...cat.expenses, ...newExpenses.expenses],
+                expenses: [
+                  ...cat.expenses.slice(0, (newPage - 1) * 10),
+                  ...newExpenses.expenses,
+                  ...cat.expenses.slice(newPage * 10)
+                ],
                 totalPages: newExpenses.totalPages
               }
             : cat
@@ -134,19 +145,19 @@ const Expense = () => {
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [expensesData, activeCategory, getToken, userId, queryClient]);
 
-  const handleCategoryChange = (category: string) => {
+  const handleCategoryChange = useCallback((category: string) => {
     setActiveCategory(category);
-  };
+  }, []);
 
   const memoizedExpensesData = useMemo(() => {
     if (!expensesData) return null;
     return {
       ...expensesData,
-      expenses: expensesData.expenses.map((category: { expenses: string | any[]; currentPage: number; }) => ({
+      expenses: expensesData.expenses.map((category: ExpenseCategory) => ({
         ...category,
-        expenses: category.expenses.slice(0, category.currentPage * 10) // Only show loaded expenses
+        expenses: category.expenses
       }))
     };
   }, [expensesData]);
@@ -189,6 +200,7 @@ const Expense = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        <StatusBar barStyle="dark-content" />
         <ToastManager height={100} width={350} />
         <View className="flex-row justify-between items-center mb-6">
           <Text className="text-3xl font-JakartaExtraBold text-secondary-900">
@@ -274,4 +286,4 @@ const Expense = () => {
   );
 };
 
-export default Expense;
+export default React.memo(Expense);

@@ -31,7 +31,7 @@ interface ExpenseCategoryTabsProps {
   loadingMore: boolean;
 }
 
-const CategoryIcon: React.FC<{ category: string }> = ({ category }) => {
+const CategoryIcon: React.FC<{ category: string }> = React.memo(({ category }) => {
   const iconMap: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
     Food: "food",
     Miscellaneous: "package-variant",
@@ -46,9 +46,9 @@ const CategoryIcon: React.FC<{ category: string }> = ({ category }) => {
       color="#0286FF"
     />
   );
-};
+});
 
-const ExpenseItem: React.FC<{ item: Expense; onDelete: (id: string) => void }> = ({ item, onDelete }) => (
+const ExpenseItem: React.FC<{ item: Expense; onDelete: (id: string) => void }> = React.memo(({ item, onDelete }) => (
   <View className="bg-white rounded-lg p-4 mb-3 shadow-md border border-primary-200">
     <View className="flex-row justify-between items-center mb-2">
       <View className="flex-1 mr-2">
@@ -72,14 +72,14 @@ const ExpenseItem: React.FC<{ item: Expense; onDelete: (id: string) => void }> =
       <MaterialCommunityIcons name="delete" size={20} color="#EF4444" />
     </TouchableOpacity>
   </View>
-);
+));
 
 const CustomPagination: React.FC<{
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
   loadingMore: boolean;
-}> = ({ currentPage, totalPages, onPageChange, loadingMore }) => {
+}> = React.memo(({ currentPage, totalPages, onPageChange, loadingMore }) => {
   if (totalPages <= 1) return null;
 
   return (
@@ -104,9 +104,9 @@ const CustomPagination: React.FC<{
       {loadingMore && <ActivityIndicator size="small" color="#0286FF" style={{ marginLeft: 10 }} />}
     </View>
   );
-};
+});
 
-export const ExpenseCategoryTabs: React.FC<ExpenseCategoryTabsProps> = ({ 
+export const ExpenseCategoryTabs: React.FC<ExpenseCategoryTabsProps> = React.memo(({ 
   data, 
   onPageChange, 
   onCategoryChange, 
@@ -151,10 +151,25 @@ export const ExpenseCategoryTabs: React.FC<ExpenseCategoryTabsProps> = ({
   }, [deleteMutation]);
 
   // Split categories into 2 rows
-  const row1Categories = data.slice(0, 2);
-  const row2Categories = data.slice(2);
+  const row1Categories = useMemo(() => data.slice(0, 2), [data]);
+  const row2Categories = useMemo(() => data.slice(2), [data]);
 
-  const renderTabBar = () => (
+  const renderTab = useCallback((category: ExpenseCategory) => (
+    <TouchableOpacity
+      className={`py-3 px-4 items-center ${activeCategory === category.category ? 'border-b-2 border-primary-500' : ''}`}
+      onPress={() => onCategoryChange(category.category)}
+    >
+      <View className="flex-row items-center">
+        <CategoryIcon category={category.category} />
+        <View className="ml-2">
+          <Text className={`text-sm font-JakartaMedium ${activeCategory === category.category ? 'text-primary-500' : 'text-secondary-800'}`}>{category.category}</Text>
+          <Text className="text-xs font-JakartaBold text-primary-500">₹{category.totalExpense.toFixed(2)}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  ), [activeCategory, onCategoryChange]);
+
+  const renderTabBar = useCallback(() => (
     <View className="bg-white shadow-sm mb-4 rounded-lg">
       {/* First row */}
       <FlatList
@@ -175,24 +190,13 @@ export const ExpenseCategoryTabs: React.FC<ExpenseCategoryTabsProps> = ({
         contentContainerStyle={{ paddingHorizontal: 8 }}
       />
     </View>
-  );
-
-  const renderTab = (category: ExpenseCategory) => (
-    <TouchableOpacity
-      className={`py-3 px-4 items-center ${activeCategory === category.category ? 'border-b-2 border-primary-500' : ''}`}
-      onPress={() => onCategoryChange(category.category)}
-    >
-      <View className="flex-row items-center">
-        <CategoryIcon category={category.category} />
-        <View className="ml-2">
-          <Text className={`text-sm font-JakartaMedium ${activeCategory === category.category ? 'text-primary-500' : 'text-secondary-800'}`}>{category.category}</Text>
-          <Text className="text-xs font-JakartaBold text-primary-500">₹{category.totalExpense.toFixed(2)}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+  ), [row1Categories, row2Categories, renderTab]);
 
   const activeData = useMemo(() => data.find(cat => cat.category === activeCategory), [data, activeCategory]);
+
+  const renderExpenseItem = useCallback(({ item }: { item: Expense }) => (
+    <ExpenseItem item={item} onDelete={handleDelete} />
+  ), [handleDelete]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -206,7 +210,7 @@ export const ExpenseCategoryTabs: React.FC<ExpenseCategoryTabsProps> = ({
         <>
           <FlatList
             data={activeData.expenses}
-            renderItem={({ item }) => <ExpenseItem item={item} onDelete={handleDelete} />}
+            renderItem={renderExpenseItem}
             keyExtractor={(item) => item._id}
             contentContainerStyle={{ padding: 16 }}
             ListEmptyComponent={() => (
@@ -223,4 +227,4 @@ export const ExpenseCategoryTabs: React.FC<ExpenseCategoryTabsProps> = ({
       )}
     </View>
   );
-};
+});

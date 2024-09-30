@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
-import { SafeAreaView, ScrollView, View, Text, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useCallback, useMemo } from 'react';
+import { SafeAreaView, ScrollView, View, Text, TouchableOpacity, ActivityIndicator, RefreshControl, StatusBar } from 'react-native';
+import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { getOwesToUsers, getMoneyFromUser, payFriend, deleteOwe } from '@/actions/owe.actions';
 import { OweList } from '@/components/owe/OweList';
@@ -9,48 +9,70 @@ import Toast from 'react-native-toast-message';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Owe } from '@/types/types';
 
-const AskFriendPage = () => {
+type TabButtonProps = {
+  title: string;
+  isActive: boolean;
+  onPress: () => void;
+};
+
+// Custom hooks with type safety
+const useOwesQuery = (getToken: () => Promise<string | null>, userId: string | null | undefined) => {
+  return useQuery<Owe[], Error>({
+    queryKey: ["owes"],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token || !userId) throw new Error("Authentication required");
+      return getOwesToUsers(token, userId);
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes caching
+  });
+};
+
+const useMoneyOwedQuery = (getToken: () => Promise<string | null>, userId: string | null | undefined) => {
+  return useQuery<Owe[], Error>({
+    queryKey: ["moneyOwed"],
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token || !userId) throw new Error("Authentication required");
+      return getMoneyFromUser(token, userId);
+    },
+  });
+};
+
+// Memoized components
+const TabButton: React.FC<TabButtonProps> = React.memo(({ title, isActive, onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    className={`flex-1 py-3 ${isActive ? 'bg-primary-500 shadow-md' : ''} rounded-full`}
+  >
+    <Text className={`text-center font-JakartaMedium ${isActive ? 'text-white' : 'text-primary-500'}`}>{title}</Text>
+  </TouchableOpacity>
+));
+
+const AskFriendPage: React.FC = () => {
   const { getToken, userId } = useAuth();
   const queryClient = useQueryClient();
   const [payingOweId, setPayingOweId] = useState<string | null>(null);
   const [deletingOweId, setDeletingOweId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('pendingOwes');
-  const [activeMoneyOwedTab, setActiveMoneyOwedTab] = useState('pendingMoneyOwed');
+  const [activeTab, setActiveTab] = useState<'pendingOwes' | 'confirmedOwes'>('pendingOwes');
+  const [activeMoneyOwedTab, setActiveMoneyOwedTab] = useState<'pendingMoneyOwed' | 'confirmedMoneyOwed'>('pendingMoneyOwed');
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
-  const fetchOwes = async () => {
-    const token = await getToken();
-    if (!token || !userId) throw new Error("Authentication required");
-    return getOwesToUsers(token, userId);
-  };
+  const { data: owes, isLoading: loadingOwes, isError: errorOwes, refetch: refetchOwes } = useOwesQuery(getToken, userId);
+  const { data: moneyOwed, isLoading: loadingMoneyOwed, isError: errorMoneyOwed, refetch: refetchMoneyOwed } = useMoneyOwedQuery(getToken, userId);
 
-  const fetchMoneyOwed = async () => {
-    const token = await getToken();
-    if (!token || !userId) throw new Error("Authentication required");
-    return getMoneyFromUser(token, userId);
-  };
-
-  const { data: owes, isLoading: loadingOwes, isError: errorOwes, refetch: refetchOwes } = useQuery({
-    queryKey: ["owes"],
-    queryFn: fetchOwes,
-  });
-
-  const { data: moneyOwed, isLoading: loadingMoneyOwed, isError: errorMoneyOwed, refetch: refetchMoneyOwed } = useQuery({
-    queryKey: ["moneyOwed"],
-    queryFn: fetchMoneyOwed,
-  });
-
-  const payOweMutation = useMutation({
+  const payOweMutation = useMutation<void, Error, string>({
     mutationFn: async (oweId: string) => {
       const token = await getToken();
       if (!token || !userId) throw new Error("Authentication required");
       return payFriend(oweId, token, userId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["owes"] });
-      queryClient.invalidateQueries({ queryKey: ["moneyOwed"] });
+      queryClient.invalidateQueries({ queryKey: ["owes", "moneyOwed"] });
       Toast.show({
         type: 'success',
         text1: 'Successfully paid friend',
@@ -58,7 +80,7 @@ const AskFriendPage = () => {
       });
       setPayingOweId(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -68,15 +90,14 @@ const AskFriendPage = () => {
     },
   });
 
-  const deleteOweMutation = useMutation({
+  const deleteOweMutation = useMutation<void, Error, string>({
     mutationFn: async (oweId: string) => {
       const token = await getToken();
       if (!token || !userId) throw new Error("Authentication required");
       return deleteOwe(oweId, token, userId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["moneyOwed"] });
-      queryClient.invalidateQueries({ queryKey: ["owes"] });
+      queryClient.invalidateQueries({ queryKey: ["moneyOwed", "owes"] });
       Toast.show({
         type: 'success',
         text1: 'Owe deleted successfully',
@@ -84,7 +105,7 @@ const AskFriendPage = () => {
       });
       setDeletingOweId(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -94,21 +115,28 @@ const AskFriendPage = () => {
     },
   });
 
-  const handlePayOwe = (oweId: string) => {
+  const handlePayOwe = useCallback((oweId: string) => {
     setPayingOweId(oweId);
     payOweMutation.mutate(oweId);
-  };
+  }, [payOweMutation]);
 
-  const handleDeleteOwe = (oweId: string) => {
+  const handleDeleteOwe = useCallback((oweId: string) => {
     setDeletingOweId(oweId);
     deleteOweMutation.mutate(oweId);
-  };
+  }, [deleteOweMutation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([refetchOwes(), refetchMoneyOwed()]);
     setRefreshing(false);
   }, [refetchOwes, refetchMoneyOwed]);
+
+  const { pendingOwes, confirmedOwes, pendingMoneyOwed, confirmedMoneyOwed } = useMemo(() => ({
+    pendingOwes: owes?.filter((owe) => !owe.paid) || [],
+    confirmedOwes: owes?.filter((owe) => owe.paid) || [],
+    pendingMoneyOwed: moneyOwed?.filter((owe) => !owe.paid) || [],
+    confirmedMoneyOwed: moneyOwed?.filter((owe) => owe.paid) || [],
+  }), [owes, moneyOwed]);
 
   if (loadingOwes || loadingMoneyOwed) {
     return (
@@ -133,14 +161,10 @@ const AskFriendPage = () => {
     );
   }
 
-  const pendingOwes = owes?.filter((owe) => !owe.paid) || [];
-  const confirmedOwes = owes?.filter((owe) => owe.paid) || [];
-  const pendingMoneyOwed = moneyOwed?.filter((owe) => !owe.paid) || [];
-  const confirmedMoneyOwed = moneyOwed?.filter((owe) => owe.paid) || [];
-
   return (
     <SafeAreaProvider>
       <SafeAreaView className="flex-1 pt-8 bg-primary-100">
+        <StatusBar barStyle="dark-content" />
         <ScrollView
           contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 60 }}
           refreshControl={
@@ -157,18 +181,16 @@ const AskFriendPage = () => {
           <View className="mb-8">
             <Text className="text-xl font-JakartaSemiBold mb-4 text-primary-800">Transactions to Pay</Text>
             <View className="flex-row mb-4 bg-primary-200 p-1 rounded-full">
-              <TouchableOpacity
+              <TabButton
+                title="Pending"
+                isActive={activeTab === 'pendingOwes'}
                 onPress={() => setActiveTab('pendingOwes')}
-                className={`flex-1 py-3 ${activeTab === 'pendingOwes' ? 'bg-primary-500 shadow-md' : ''} rounded-full`}
-              >
-                <Text className={`text-center font-JakartaMedium ${activeTab === 'pendingOwes' ? 'text-white' : 'text-primary-500'}`}>Pending</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              />
+              <TabButton
+                title="Paid"
+                isActive={activeTab === 'confirmedOwes'}
                 onPress={() => setActiveTab('confirmedOwes')}
-                className={`flex-1 py-3 ${activeTab === 'confirmedOwes' ? 'bg-primary-500 shadow-md' : ''} rounded-full`}
-              >
-                <Text className={`text-center font-JakartaMedium ${activeTab === 'confirmedOwes' ? 'text-white' : 'text-primary-500'}`}>Paid</Text>
-              </TouchableOpacity>
+              />
             </View>
             <View className="min-h-[100px]">
               <OweList
@@ -183,18 +205,16 @@ const AskFriendPage = () => {
           <View className="mb-8">
             <Text className="text-xl font-JakartaSemiBold mb-4 text-primary-800">Owes Remaining</Text>
             <View className="flex-row mb-4 bg-primary-200 p-1 rounded-full">
-              <TouchableOpacity
+              <TabButton
+                title="To be Paid"
+                isActive={activeMoneyOwedTab === 'pendingMoneyOwed'}
                 onPress={() => setActiveMoneyOwedTab('pendingMoneyOwed')}
-                className={`flex-1 py-3 ${activeMoneyOwedTab === 'pendingMoneyOwed' ? 'bg-primary-500 shadow-md' : ''} rounded-full`}
-              >
-                <Text className={`text-center font-JakartaMedium ${activeMoneyOwedTab === 'pendingMoneyOwed' ? 'text-white' : 'text-primary-500'}`}>To be Paid</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              />
+              <TabButton
+                title="Paid"
+                isActive={activeMoneyOwedTab === 'confirmedMoneyOwed'}
                 onPress={() => setActiveMoneyOwedTab('confirmedMoneyOwed')}
-                className={`flex-1 py-3 ${activeMoneyOwedTab === 'confirmedMoneyOwed' ? 'bg-primary-500 shadow-md' : ''} rounded-full`}
-              >
-                <Text className={`text-center font-JakartaMedium ${activeMoneyOwedTab === 'confirmedMoneyOwed' ? 'text-white' : 'text-primary-500'}`}>Paid</Text>
-              </TouchableOpacity>
+              />
             </View>
             <View className="min-h-[100px]">
               <MoneyOwedList
@@ -212,4 +232,4 @@ const AskFriendPage = () => {
   );
 };
 
-export default AskFriendPage;
+export default React.memo(AskFriendPage);

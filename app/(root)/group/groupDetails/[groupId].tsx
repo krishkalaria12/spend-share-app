@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, FlatList, Animated, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, FlatList, Animated, SafeAreaView, ActivityIndicator, StatusBar } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { Group, Friend } from '@/types/types';
@@ -204,6 +204,7 @@ const GroupDetails = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-primary-100">
+      <StatusBar barStyle="dark-content" />
       <ScrollView className="flex-1">
         <LinearGradient
           colors={['#0286FF', '#0250FF']}

@@ -22,6 +22,7 @@ import Animated, {
   FadeInDown,
   FadeOutUp
 } from 'react-native-reanimated';
+import { StatusBar } from "react-native";
 
 const formSchema = z.object({
   category: z.string().min(1, { message: "Category is required." }),
@@ -123,6 +124,7 @@ const AskMoneyFromFriend: React.FC = () => {
 
   return (
     <ScrollView className="flex-1 bg-primary-100">
+      <StatusBar barStyle="dark-content" />
       <Animated.View 
         entering={FadeInDown.duration(800).springify()}
         style={[{ padding: 20 }, animatedStyle]}

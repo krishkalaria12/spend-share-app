@@ -51,9 +51,15 @@ declare interface ExpenseCategory {
 
 declare interface FeedbackType {
     _id: string;
-    owner: { username: string; avatar: { url: string }; clerkId: string };
     message: string;
     createdAt: string;
+    likes: number;
+    owner: {
+        username: string;
+        fullName: string;
+        avatar: { url: string };
+        clerkId: string;
+    };
     isLiked: boolean;
 };
 

@@ -17,6 +17,7 @@ import { useAuth } from "@clerk/clerk-expo";
 import { upload } from "cloudinary-react-native";
 import { cld } from "@/utils/Cloudinary";
 import { useRouter } from "expo-router";
+import { StatusBar } from "react-native";
 
 // Validation Schema with Zod
 const formSchema = z.object({
@@ -164,6 +165,7 @@ export default function CreateGroupPage() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
+      <StatusBar barStyle="dark-content" />
       <ScrollView className="p-6" contentContainerStyle={{ paddingBottom: 80 }}>
         <Text className="text-3xl font-JakartaBold mb-4 text-primary-500">Create Group</Text>
 

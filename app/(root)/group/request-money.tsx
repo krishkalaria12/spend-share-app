@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,6 +11,7 @@ import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
 import { useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'react-native';
 
 const formSchema = z.object({
   title: z.string().min(1, { message: "Title is required." }),
@@ -21,22 +22,28 @@ const formSchema = z.object({
   memberShares: z.record(z.string(), z.string()).optional(),
 });
 
-export type RequestMoneyFormData = z.infer<typeof formSchema>;
+type RequestMoneyFormData = z.infer<typeof formSchema>;
 
 const categories = ['Food', 'Studies', 'Outing', 'Miscellaneous'];
 const splitTypes = ['EQUAL', 'PERCENTAGE', 'SHARE'];
 
 export const ExpenseSplittingForm: React.FC = () => {
   const params = useLocalSearchParams();
-  const group = JSON.parse(params.group as string);
-  const groupId = group._id;
-  const groupMembers = group.members;
+  const groupId = params.groupId as string;
+  const groupMembers = useMemo(() => {
+    try {
+      return JSON.parse(params.groupMembers as string);
+    } catch (error) {
+      console.error('Error parsing group members:', error);
+      return [];
+    }
+  }, [params.groupMembers]);
 
   const [step, setStep] = useState(1);
   const { userId, getToken } = useAuth();
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
-  const { control, handleSubmit, formState: { errors }, watch, setValue, getValues } = useForm<RequestMoneyFormData>({
+  const { control, handleSubmit, formState: { errors, isValid }, watch, setValue, getValues, trigger } = useForm<RequestMoneyFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
@@ -46,19 +53,21 @@ export const ExpenseSplittingForm: React.FC = () => {
       splitType: 'EQUAL',
       memberShares: {},
     },
+    mode: 'onChange',
   });
 
   const watchSplitType = watch('splitType');
+  const watchAmount = watch('amount');
 
   const mutation = useMutation({
-    mutationFn: async (RequestMoneyFormData: RequestMoneyFormData) => {
+    mutationFn: async (data: RequestMoneyFormData) => {
       const token = await getToken();
       if (!token || !userId) throw new Error("Authentication required");
-      return requestMoneyFromGroup(userId, groupId, token, RequestMoneyFormData);
+      return requestMoneyFromGroup(userId, groupId, token, data);
     },
-    onSuccess: (response) => {
-      console.log(response);
+    onSuccess: () => {
       Alert.alert("Success", "Request sent successfully");
+      // Reset form or navigate to another screen
     },
     onError: (error) => {
       console.error(error);
@@ -66,13 +75,13 @@ export const ExpenseSplittingForm: React.FC = () => {
     },
   });
 
-  const onSubmit = (data: RequestMoneyFormData) => {
+  const onSubmit = useCallback((data: RequestMoneyFormData) => {
     let userShare = 0;
     const totalAmount = parseFloat(data.amount);
     const memberShares = data.memberShares || {};
     
     if (data.splitType === 'EQUAL') {
-      const equalShare = totalAmount / (selectedMembers.length);
+      const equalShare = totalAmount / (selectedMembers.length + 1);
       selectedMembers.forEach((memberId: string) => {
         memberShares[memberId] = equalShare.toFixed(2);
       });
@@ -88,29 +97,37 @@ export const ExpenseSplittingForm: React.FC = () => {
 
     memberShares['mine'] = userShare.toFixed(2);
     mutation.mutate({ ...data, memberShares });
-  };
+  }, [selectedMembers, mutation]);
 
-  const addMember = (memberId: string) => {
-    setSelectedMembers([...selectedMembers, memberId]);
-  };
+  const addMember = useCallback((memberId: string) => {
+    setSelectedMembers(prev => [...prev, memberId]);
+  }, []);
 
-  const removeMember = (index: number) => {
-    const newSelected = [...selectedMembers];
-    newSelected.splice(index, 1);
-    setSelectedMembers(newSelected);
-    const shares = { ...getValues('memberShares') };
-    delete shares[selectedMembers[index]];
-    setValue('memberShares', shares);
-  };
+  const removeMember = useCallback((index: number) => {
+    setSelectedMembers(prev => {
+      const newSelected = [...prev];
+      newSelected.splice(index, 1);
+      return newSelected;
+    });
+  
+    const currentShares = getValues('memberShares') || {};
+    const updatedShares = { ...currentShares };
+    delete updatedShares[selectedMembers[index]]; // Remove the share
+    
+    // Pass the updated object directly to setValue
+    setValue('memberShares', updatedShares);
+  }, [selectedMembers, setValue, getValues]);
+  
+  
 
-  const availableMembers = groupMembers.filter(
+  const availableMembers = useMemo(() => groupMembers.filter(
     (member: { _id: string, clerkId: string }) => !selectedMembers.includes(member._id) && member.clerkId !== userId
-  );
+  ), [groupMembers, selectedMembers, userId]);
 
-  const validateTotalShares = () => {
+  const validateTotalShares = useCallback(() => {
     const totalAmount = parseFloat(getValues('amount'));
     const shares = getValues('memberShares') || {};
-    const totalShares = Object.values(shares).reduce((sum, share) => sum + parseFloat(share), 0);
+    const totalShares = Object.values(shares).reduce((sum, share) => sum + parseFloat(share || '0'), 0);
 
     if (watchSplitType === 'PERCENTAGE' && totalShares > 100) {
       return "Total percentage cannot exceed 100%";
@@ -119,7 +136,7 @@ export const ExpenseSplittingForm: React.FC = () => {
       return "Total shares cannot exceed the total amount";
     }
     return true;
-  };
+  }, [getValues, watchSplitType]);
 
   useEffect(() => {
     if (watchSplitType === 'EQUAL') {
@@ -127,6 +144,12 @@ export const ExpenseSplittingForm: React.FC = () => {
       setValue('memberShares', {});
     }
   }, [watchSplitType, setValue]);
+
+  useEffect(() => {
+    if (watchSplitType !== 'EQUAL' && watchAmount) {
+      trigger('memberShares');
+    }
+  }, [watchAmount, watchSplitType, trigger]);
 
   const renderStepIndicator = () => (
     <View className="flex-row justify-center mb-6">
@@ -144,16 +167,31 @@ export const ExpenseSplittingForm: React.FC = () => {
         <Controller
           control={control}
           name={`memberShares.${memberId}`}
-          render={({ field: { onChange, value } }) => (
-            <InputField
-              label={watchSplitType === 'PERCENTAGE' ? 'Percentage' : 'Amount'}
-              value={value}
-              onChangeText={onChange}
-              keyboardType="numeric"
-              containerStyle="w-24 ml-2"
-              inputStyle="text-right"
-              placeholder={watchSplitType === 'PERCENTAGE' ? "%" : "$"}
-            />
+          rules={{
+            required: 'This field is required',
+            validate: (value) => {
+              if (watchSplitType === 'PERCENTAGE' && parseFloat(value) > 100) {
+                return 'Percentage cannot exceed 100';
+              }
+              if (watchSplitType === 'SHARE' && parseFloat(value) > parseFloat(watchAmount)) {
+                return 'Share cannot exceed total amount';
+              }
+              return true;
+            }
+          }}
+          render={({ field: { onChange, value }, fieldState: { error } }) => (
+            <View>
+              <InputField
+                label={watchSplitType === 'PERCENTAGE' ? 'Percentage' : 'Amount'}
+                value={value}
+                onChangeText={onChange}
+                keyboardType="numeric"
+                containerStyle="w-24 ml-2"
+                inputStyle="text-right"
+                placeholder={watchSplitType === 'PERCENTAGE' ? "%" : "$"}
+              />
+              {error && <Text className="text-red-500 text-xs mt-1">{error.message}</Text>}
+            </View>
           )}
         />
         <TouchableOpacity onPress={() => removeMember(index)} className="ml-2">
@@ -171,43 +209,49 @@ export const ExpenseSplittingForm: React.FC = () => {
             <Controller
               control={control}
               name="title"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <InputField
-                  label="Title"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  containerStyle={`mb-4 ${errors.title ? 'border-red-500' : ''}`}
-                  placeholder="Enter expense title"
-                />
+              render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+                <>
+                  <InputField
+                    label="Title"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    containerStyle={`mb-1 ${error ? 'border-red-500' : ''}`}
+                    placeholder="Enter expense title"
+                  />
+                  {error && <Text className="text-red-500 text-xs mb-4">{error.message}</Text>}
+                </>
               )}
             />
             <Controller
               control={control}
               name="description"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <InputField
-                  label="Description"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  multiline
-                  numberOfLines={3}
-                  containerStyle={`mb-4 h-24 ${errors.description ? 'border-red-500' : ''}`}
-                  placeholder="Enter expense description"
-                />
+              render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+                <>
+                  <InputField
+                    label="Description"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    multiline
+                    numberOfLines={3}
+                    containerStyle={`mb-1 h-24 ${error ? 'border-red-500' : ''}`}
+                    placeholder="Enter expense description"
+                  />
+                  {error && <Text className="text-red-500 text-xs mb-4">{error.message}</Text>}
+                </>
               )}
             />
             <Controller
               control={control}
               name="category"
-              render={({ field: { onChange, value } }) => (
+              render={({ field: { onChange, value }, fieldState: { error } }) => (
                 <View className="mb-4">
                   <Text className="text-base font-semibold mb-2 text-gray-700">Category</Text>
-                  <View className="border border-gray-300 rounded-md">
+                  <View className={`border rounded-md ${error ? 'border-red-500' : 'border-gray-300'}`}>
                     <Picker
                       selectedValue={value}
-                      onValueChange={(itemValue) => onChange(itemValue)}
+                      onValueChange={onChange}
                       className="h-12"
                     >
                       <Picker.Item label="Select a category..." value="" />
@@ -216,28 +260,37 @@ export const ExpenseSplittingForm: React.FC = () => {
                       ))}
                     </Picker>
                   </View>
+                  {error && <Text className="text-red-500 text-xs mt-1">{error.message}</Text>}
                 </View>
               )}
             />
             <Controller
               control={control}
               name="amount"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <InputField
-                  label="Total Amount"
-                  keyboardType="numeric"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  containerStyle={`mb-4 ${errors.amount ? 'border-red-500' : ''}`}
-                  placeholder="Enter total amount"
-                />
+              render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+                <>
+                  <InputField
+                    label="Total Amount"
+                    keyboardType="numeric"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    containerStyle={`mb-1 ${error ? 'border-red-500' : ''}`}
+                    placeholder="Enter total amount"
+                  />
+                  {error && <Text className="text-red-500 text-xs mb-4">{error.message}</Text>}
+                </>
               )}
             />
             <CustomButton
               title="Next"
-              onPress={() => setStep(2)}
-              className="mt-4 bg-blue-500 py-3 rounded-full"
+              onPress={() => {
+                trigger().then((isValid) => {
+                  if (isValid) setStep(2);
+                });
+              }}
+              disabled={!isValid}
+              className={`mt-4 py-3 rounded-full ${isValid ? 'bg-blue-500' : 'bg-gray-400'}`}
             />
           </View>
         );
@@ -253,7 +306,7 @@ export const ExpenseSplittingForm: React.FC = () => {
                   <View className="border border-gray-300 rounded-md">
                     <Picker
                       selectedValue={value}
-                      onValueChange={(itemValue) => onChange(itemValue)}
+                      onValueChange={onChange}
                       className="h-12"
                     >
                       <Picker.Item label="Select split type..." value="" />
@@ -291,11 +344,12 @@ export const ExpenseSplittingForm: React.FC = () => {
               <Text className="text-red-500 text-sm font-medium mt-2 mb-4">{validateTotalShares()}</Text>
             )}
             <CustomButton
-              title="Submit"
+              title={mutation.isPending ? "Submitting..." : "Submit"}
               onPress={handleSubmit(onSubmit)}
-              disabled={mutation.isPending}
-              className="mt-4 bg-green-500 py-3 rounded-full"
+              disabled={mutation.isPending || !isValid || validateTotalShares() !== true}
+              className={`mt-4 py-3 rounded-full ${mutation.isPending || !isValid || validateTotalShares() !== true ? 'bg-gray-400' : 'bg-green-500'}`}
             />
+            {mutation.isPending && <ActivityIndicator size="large" color="#0000ff" className="mt-4" />}
           </View>
         );
       default:
@@ -305,8 +359,9 @@ export const ExpenseSplittingForm: React.FC = () => {
 
   return (
     <ScrollView className="flex-1 bg-gradient-to-b from-blue-600 to-blue-800">
+      <StatusBar barStyle="light-content" />
       <View className="p-6 pb-10">
-        <Text className="text-3xl font-bold text-primary-500 mb-6 text-center">Expense Splitting</Text>
+        <Text className="text-3xl font-bold text-white mb-6 text-center">Expense Splitting</Text>
         {renderStepIndicator()}
         {renderStepContent()}
       </View>

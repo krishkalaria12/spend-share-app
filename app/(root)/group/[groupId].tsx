@@ -95,6 +95,7 @@ const GroupId = () => {
         onPageChange={handlePageChange}
         groupId={groupId}
         currentUserId={userId}
+        groupMembers={group?.members}
       />
     ) : null, 
     [groupTransactions, loadingGroupTransactions, handlePageChange, groupId, userId]

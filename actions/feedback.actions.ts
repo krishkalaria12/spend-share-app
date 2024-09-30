@@ -1,16 +1,4 @@
-type FeedbackType = {
-  _id: string;
-  message: string;
-  createdAt: string;
-  likes: number;
-  owner: {
-    username: string;
-    fullName: string;
-    avatar: string;
-    clerkId: string;
-  };
-  isLiked: boolean;
-};
+import { FeedbackType } from "@/types/types";
 
 export const getFeedback = async (
   page: number,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { View, ScrollView, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
@@ -71,43 +71,46 @@ const AddExpense: React.FC = () => {
         },
     });
 
-    const onSubmit = (data: FormData) => {
+    const onSubmit = useCallback((data: FormData) => {
         mutation.mutate(data);
-    };
+    }, [mutation]);
 
-    const renderErrors = () => {
+    const renderErrors = useMemo(() => {
         const errorMessages = Object.values(errors).map(error => error?.message);
         if (errorMessages.length === 0) return null;
 
         return (
-            <View style={{ backgroundColor: '#FEE2E2', padding: 16, borderRadius: 12, marginTop: 16 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View className="bg-red-100 p-4 rounded-xl mt-4">
+                <View className="flex-row items-center mb-2">
                     <ExclamationTriangleIcon size={20} color="#DC2626" />
-                    <Text style={{ color: '#DC2626', fontWeight: 'bold', marginLeft: 8 }}>Please correct the following errors:</Text>
+                    <Text className="text-red-600 font-bold ml-2">Please correct the following errors:</Text>
                 </View>
                 {errorMessages.map((message, index) => (
-                    <Text key={index} style={{ color: '#DC2626', marginLeft: 20 }}>• {message}</Text>
+                    <Text key={index} className="text-red-600 ml-5">• {message}</Text>
                 ))}
             </View>
         );
-    };
+    }, [errors]);
+
+    const MemoizedInputField = useMemo(() => React.memo(InputField), []);
+    const MemoizedCustomButton = useMemo(() => React.memo(CustomButton), []);
+    const MemoizedPicker = useMemo(() => React.memo(Picker), []);
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F3F4F6' }}>
-            <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 16 }}>
+        <SafeAreaView className="flex-1 bg-gray-100">
+            <ScrollView className="flex-grow p-4">
                 <Toast />
-                <View style={{ backgroundColor: 'white', borderRadius: 12, padding: 24, shadowColor: '#000', shadowOpacity: 0.1 }}>
+                <View className="bg-white rounded-xl p-6 shadow-sm">
                     <Controller
                         control={control}
                         name="title"
                         render={({ field: { onChange, onBlur, value } }) => (
-                            <InputField
+                            <MemoizedInputField
                                 label="Title"
                                 placeholder="Enter expense title"
                                 onChangeText={onChange}
                                 onBlur={onBlur}
                                 value={value}
-                                // customReactIcon={() => <Ionicons name="pencil" size={20} color="#0286FF" />}
                             />
                         )}
                     />
@@ -116,14 +119,13 @@ const AddExpense: React.FC = () => {
                         control={control}
                         name="amount"
                         render={({ field: { onChange, onBlur, value } }) => (
-                            <InputField
+                            <MemoizedInputField
                                 label="Amount"
                                 placeholder="Enter amount"
                                 keyboardType="decimal-pad"
                                 onChangeText={onChange}
                                 onBlur={onBlur}
                                 value={value}
-                                // customReactIcon={() => <Ionicons name='cash-outline' size={20} color="#0286FF" />}
                             />
                         )}
                     />
@@ -132,7 +134,7 @@ const AddExpense: React.FC = () => {
                         control={control}
                         name="description"
                         render={({ field: { onChange, onBlur, value } }) => (
-                            <InputField
+                            <MemoizedInputField
                                 label="Description"
                                 placeholder="Enter description"
                                 multiline
@@ -141,7 +143,6 @@ const AddExpense: React.FC = () => {
                                 onChangeText={onChange}
                                 onBlur={onBlur}
                                 value={value}
-                                // customReactIcon={() => <Ionicons name='create-outline' size={20} color="#0286FF" />}
                             />
                         )}
                     />
@@ -151,31 +152,29 @@ const AddExpense: React.FC = () => {
                         name="category"
                         render={({ field: { onChange, value } }) => (
                             <View>
-                                <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#1E3A8A' }}>Category</Text>
-                                <View style={{ borderColor: '#0286FF', borderWidth: 1, borderRadius: 8 }}>
-                                    <Picker
+                                <Text className="text-base font-semibold mb-2 text-blue-900">Category</Text>
+                                <View className="border border-blue-500 rounded-lg">
+                                    <MemoizedPicker
                                         selectedValue={value}
                                         onValueChange={onChange}
-                                        style={{ color: '#475A99' }}
+                                        className="text-blue-700"
                                     >
                                         {categories.map((category) => (
                                             <Picker.Item key={category} label={category} value={category} />
                                         ))}
-                                    </Picker>
+                                    </MemoizedPicker>
                                 </View>
                             </View>
                         )}
                     />
 
-                    {renderErrors()}
+                    {renderErrors}
 
-                    <CustomButton
+                    <MemoizedCustomButton
                         title={mutation.isPending ? "Adding..." : "Add Expense"}
                         onPress={handleSubmit(onSubmit)}
                         disabled={mutation.isPending}
-                        className='mt-8'
-                        // customReactIcon={mutation.isPending ? () => <Ionicons name="sync" size={20} color="white" style={{ marginRight: 8 }} /> : () => <Ionicons name="add-circle-outline" size={20} color="white" style={{ marginRight: 8 }} />}
-                        // style={{ marginTop: 16 }}
+                        className="mt-8"
                     />
                 </View>
             </ScrollView>
@@ -183,4 +182,4 @@ const AddExpense: React.FC = () => {
     );
 };
 
-export default AddExpense;
+export default React.memo(AddExpense);

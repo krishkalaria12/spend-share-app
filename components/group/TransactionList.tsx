@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import TransactionCard from '@/components/group/TransactionCard';
-import { Transaction } from '@/types/types';
+import { Friend, Transaction } from '@/types/types';
 import { ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react-native';
 
 interface TransactionListProps {
@@ -13,6 +13,7 @@ interface TransactionListProps {
   onPageChange: (page: number) => void;
   groupId: string;
   currentUserId: string | null | undefined;
+  groupMembers:  Friend[] | undefined
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
@@ -23,6 +24,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
   onPageChange,
   groupId,
   currentUserId,
+  groupMembers
 }) => {
   const router = useRouter();
 
@@ -61,7 +63,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
         <TouchableOpacity
           onPress={() => router.push({
             pathname: '/(root)/group/request-money',
-            params: { groupId }
+            params: { groupId, groupMembers: JSON.stringify(groupMembers) }
           })}
           className="bg-primary-500 px-4 py-3 rounded-full shadow-md active:bg-primary-600 flex-row items-center"
         >
